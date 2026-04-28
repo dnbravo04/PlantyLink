@@ -58,5 +58,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '495915712501',
     projectId: 'hydrotrack-13047',
     storageBucket: 'hydrotrack-13047.firebasestorage.app',
+    databaseURL: 'https://hydrotrack-13047.firebaseio.com',
   );
 }
