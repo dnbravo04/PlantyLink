@@ -16,17 +16,20 @@ class HydroTrackApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HydroTrack',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.green,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
       home: const Scaffold(
         body: Center(
-          children: [
-            Text('HydroTrack 🌱', style: TextStyle(fontSize: 32)),
-            SizedBox(height: 16),
-            Text('Michelle Vanegas, Luis Medina, Diego Bravo'), style: TextStyle(fontSize: 16, color: Colors.blue),
-          ],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('HydroTrack 🌱', style: TextStyle(fontSize: 32)),
+              SizedBox(height: 16),
+              Text(
+                'Michelle Vanegas, Luis Medina, Diego Bravo',
+                style: TextStyle(fontSize: 16, color: Color.fromARGB(255, 21, 161, 21)),
+              ),
+            ],
+          ),
         ),
       ),
     );
