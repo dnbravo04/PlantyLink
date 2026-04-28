@@ -22,7 +22,11 @@ class HydroTrackApp extends StatelessWidget {
       ),
       home: const Scaffold(
         body: Center(
-          child: Text('HydroTrack 🌱', style: TextStyle(fontSize: 32)),
+          children: [
+            Text('HydroTrack 🌱', style: TextStyle(fontSize: 32)),
+            SizedBox(height: 16),
+            Text('Michelle Vanegas, Luis Medina, Diego Bravo'), style: TextStyle(fontSize: 16, color: Colors.blue),
+          ],
         ),
       ),
     );
