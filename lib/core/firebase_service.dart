@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_constants.dart';
 import '../models/sensor_data.dart';
 import '../models/plant_profile.dart';
 
@@ -9,32 +10,16 @@ class FirebaseService {
   FirebaseService() {
     _db = FirebaseDatabase.instanceFor(
       app: Firebase.app(),
-      databaseURL: 'https://hydrotrack-13047.firebaseio.com',
+      databaseURL: kFirebaseDatabaseUrl,
     );
   }
 
   // Stream de sensores en tiempo real
   Stream<SensorData> get sensorStream {
-    return _db
-        .ref('sensors')
-        .onValue
-        .map((event) {
-          final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
-          return SensorData.fromMap(data);
-        })
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: (sink) {
-            sink.add(
-              SensorData(
-                temperatura: 0.0,
-                humedad: 0.0,
-                nivelAgua: false,
-                timestamp: DateTime.now(),
-              ),
-            );
-          },
-        );
+    return _db.ref('sensors').onValue.map((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      return SensorData.fromMap(data);
+    });
   }
 
   // Stream de planta activa
@@ -51,11 +36,29 @@ class FirebaseService {
     });
   }
 
-  // Control de bomba
-  Future<void> activarBomba() async {
-    await _db.ref('pump/manual').set(true);
-    await Future.delayed(const Duration(seconds: 11));
-    await _db.ref('pump/manual').set(false);
+  // Control de bomba de agua
+  Future<void> controlarBombaAgua(bool estado) async {
+    await _db.ref('controls/bomba_agua').set(estado);
+  }
+
+  // Control de bomba de fertilizante
+  Future<void> controlarBombaFertilizante(bool estado) async {
+    await _db.ref('controls/bomba_fertilizante').set(estado);
+  }
+
+  // Control de dosificadora de ácido
+  Future<void> controlarDosificadoraAcido(bool estado) async {
+    await _db.ref('controls/bomba_dosificadora_acido').set(estado);
+  }
+
+  // Control de dosificadora básico
+  Future<void> controlarDosificadoraBasico(bool estado) async {
+    await _db.ref('controls/bomba_dosificadora_basico').set(estado);
+  }
+
+  // Control automático de riego
+  Future<void> activarRiegoAutomatico(bool estado) async {
+    await _db.ref('controls/riego_automatico').set(estado);
   }
 
   // Activar perfil de planta
