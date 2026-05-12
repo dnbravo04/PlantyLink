@@ -11,6 +11,7 @@ sealed class AppColors {
   static const Color cardBorder = Color(0xFF30363D);
 
   // Semantic colors
+  static const Color primary = Color(0xFF238636);
   static const Color success = Color(0xFF2EA043);
   static const Color warning = Color(0xFFD29922);
   static const Color error = Color(0xFFF85149);

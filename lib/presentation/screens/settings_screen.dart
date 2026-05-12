@@ -28,6 +28,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   double _ecMin = 1.0;
   double _ecMax = 2.0;
 
+  String _visualizationMode = 'tecnica';
+  List<String> _activeSensors = [
+    'temperatura',
+    'ph',
+    'conductividad',
+    'nivel_agua_tanque',
+    'nivel_fertilizante_tanque',
+  ];
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -48,6 +57,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await firebase.setAlertsEnabled(enabled);
   }
 
+  Future<void> _saveVisualizationMode(String mode) async {
+    final firebase = ref.read(firebaseServiceProvider);
+    await firebase.updateUserSettings({'modo_visualizacion': mode});
+    setState(() => _visualizationMode = mode);
+  }
+
+  Future<void> _saveActiveSensors() async {
+    final firebase = ref.read(firebaseServiceProvider);
+    await firebase.updateUserSettings({'sensores_activos': _activeSensors});
+  }
+
+  void _toggleSensor(String sensorKey) {
+    setState(() {
+      if (_activeSensors.contains(sensorKey)) {
+        _activeSensors.remove(sensorKey);
+      } else {
+        _activeSensors.add(sensorKey);
+      }
+    });
+    _saveActiveSensors();
+  }
+
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -65,11 +96,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Cerrar sesión', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Cerrar sesión',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -93,6 +130,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final profileAsync = ref.watch(activePlantProfileProvider);
     final alertsAsync = ref.watch(alertsEnabledProvider);
     final sensorAsync = ref.watch(sensorProvider);
+
+    // Cargar configuración del usuario
+    userAsync.whenData((user) {
+      _visualizationMode = user['modo_visualizacion'] as String? ?? 'tecnica';
+      final activeSensors =
+          user['sensores_activos'] as List<dynamic>? ??
+          [
+            'temperatura',
+            'ph',
+            'conductividad',
+            'nivel_agua_tanque',
+            'nivel_fertilizante_tanque',
+          ];
+      _activeSensors = activeSensors.cast<String>();
+    });
 
     return AppScaffold(
       appBar: AppBar(
@@ -121,6 +173,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildSectionTitle('Umbrales personalizados'),
             const SizedBox(height: 8),
             _buildThresholdsCard(profileAsync),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Sensores activos'),
+            const SizedBox(height: 8),
+            _buildActiveSensorsCard(),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle('Modo de visualización'),
+            const SizedBox(height: 8),
+            _buildVisualizationModeCard(),
             const SizedBox(height: 24),
 
             _buildSectionTitle('Notificaciones'),
@@ -209,7 +271,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (_, _) => const Text(
         'Error al cargar perfil',
         style: TextStyle(color: AppColors.textSecondary),
@@ -230,17 +293,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: isEditing
               ? TextField(
                   controller: controller,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                  ),
                   decoration: InputDecoration(
                     labelText: label,
-                    labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    labelStyle: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
                     filled: true,
                     fillColor: AppColors.background,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(color: AppColors.cardBorder),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   autofocus: true,
                 )
@@ -249,12 +321,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       controller.text.isEmpty ? '—' : controller.text,
-                      style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ],
                 ),
@@ -303,7 +381,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 2),
                     Text(
                       'Planta activa',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -319,7 +400,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (_, _) => const Text(
         'Error al cargar cultivo',
         style: TextStyle(color: AppColors.textSecondary),
@@ -406,7 +488,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.info,
                         foregroundColor: AppColors.textPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Guardar umbrales'),
                     ),
@@ -426,7 +510,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         side: const BorderSide(color: AppColors.cardBorder),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Restablecer'),
                     ),
@@ -437,7 +523,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (_, _) => const Text(
         'Error al cargar umbrales',
         style: TextStyle(color: AppColors.textSecondary),
@@ -461,14 +548,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 4),
           Row(
             children: [
               Text(
                 'Min: ${min.toStringAsFixed(1)}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
               Expanded(
                 child: RangeSlider(
@@ -483,7 +576,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               Text(
                 'Max: ${max.toStringAsFixed(1)}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -493,7 +589,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildAlertsCard(AsyncValue<bool> alertsAsync) {
-    final enabled = alertsAsync.valueOrNull ?? true;
+    final enabled = alertsAsync.value ?? true;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -503,7 +599,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.notifications_active_outlined, color: AppColors.textSecondary),
+          const Icon(
+            Icons.notifications_active_outlined,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
@@ -513,7 +612,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           IlluminatedButton(
             label: enabled ? 'Activadas' : 'Desactivadas',
-            icon: enabled ? Icons.notifications_active : Icons.notifications_off,
+            icon: enabled
+                ? Icons.notifications_active
+                : Icons.notifications_off,
             isActive: enabled,
             color: AppColors.warning,
             onTap: () => _toggleAlerts(!enabled),
@@ -549,18 +650,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(width: 10),
                   Text(
                     connected ? 'ESP32 conectado' : 'ESP32 desconectado',
-                    style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               const Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.textSecondary, size: 18),
+                  Icon(
+                    Icons.info_outline,
+                    color: AppColors.textSecondary,
+                    size: 18,
+                  ),
                   SizedBox(width: 10),
                   Text(
                     'Versión 1.0.0',
-                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -568,11 +679,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/onboarding/esp32'),
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/onboarding/esp32'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.info,
                     side: const BorderSide(color: AppColors.cardBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: const Text('Reconectar ESP32'),
                 ),
@@ -581,10 +695,217 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () =>
+          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (_, _) => const Text(
         'Error al cargar estado',
         style: TextStyle(color: AppColors.textSecondary),
+      ),
+    );
+  }
+
+  Widget _buildActiveSensorsCard() {
+    final sensors = [
+      {
+        'key': 'temperatura',
+        'label': 'Temperatura',
+        'icon': Icons.thermostat_outlined,
+      },
+      {'key': 'ph', 'label': 'pH', 'icon': Icons.science_outlined},
+      {
+        'key': 'conductividad',
+        'label': 'Conductividad',
+        'icon': Icons.electric_bolt_outlined,
+      },
+      {
+        'key': 'nivel_agua_tanque',
+        'label': 'Nivel Agua',
+        'icon': Icons.water_drop_outlined,
+      },
+      {
+        'key': 'nivel_fertilizante_tanque',
+        'label': 'Nivel Fertilizante',
+        'icon': Icons.eco_outlined,
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Selecciona los sensores que quieres ver en el dashboard',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          ...sensors.map(
+            (sensor) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    sensor['icon'] as IconData,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      sensor['label'] as String,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _toggleSensor(sensor['key'] as String),
+                    child: Container(
+                      width: 44,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: _activeSensors.contains(sensor['key'])
+                            ? AppColors.success
+                            : AppColors.cardBorder,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          _activeSensors.contains(sensor['key'])
+                              ? Icons.check
+                              : Icons.add,
+                          color: _activeSensors.contains(sensor['key'])
+                              ? AppColors.textPrimary
+                              : AppColors.textMuted,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisualizationModeCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Selecciona cómo quieres ver las métricas',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _saveVisualizationMode('tecnica'),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _visualizationMode == 'tecnica'
+                          ? AppColors.info.withValues(alpha: 0.15)
+                          : AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _visualizationMode == 'tecnica'
+                            ? AppColors.info
+                            : AppColors.cardBorder,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.speed_outlined,
+                          color: _visualizationMode == 'tecnica'
+                              ? AppColors.info
+                              : AppColors.textSecondary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Vista Técnica',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _visualizationMode == 'tecnica'
+                                  ? AppColors.info
+                                  : AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _saveVisualizationMode('sencilla'),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _visualizationMode == 'sencilla'
+                          ? AppColors.success.withValues(alpha: 0.15)
+                          : AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _visualizationMode == 'sencilla'
+                            ? AppColors.success
+                            : AppColors.cardBorder,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.visibility_outlined,
+                          color: _visualizationMode == 'sencilla'
+                              ? AppColors.success
+                              : AppColors.textSecondary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Vista Sencilla',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: _visualizationMode == 'sencilla'
+                                  ? AppColors.success
+                                  : AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -92,10 +92,7 @@ class FirebaseService {
   Future<void> updateUserProfile(String name, String city) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    await _db.ref('usuarios/$uid').update({
-      'nombre': name,
-      'ciudad': city,
-    });
+    await _db.ref('usuarios/$uid').update({'nombre': name, 'ciudad': city});
   }
 
   // -------------------------------------------------------------------------
@@ -118,5 +115,11 @@ class FirebaseService {
 
   Future<void> updateProfileThresholds(Map<String, dynamic> values) async {
     await _db.ref('profile').update(values);
+  }
+
+  Future<void> updateUserSettings(Map<String, dynamic> settings) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.ref('usuarios/$uid').update(settings);
   }
 }
