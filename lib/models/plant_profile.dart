@@ -4,6 +4,7 @@ class PlantProfile {
   final double tempMin, tempMax;
   final double humMin, humMax;
   final double phMin, phMax;
+  final double ecMin, ecMax;
 
   const PlantProfile({
     required this.nombre,
@@ -14,6 +15,8 @@ class PlantProfile {
     required this.humMax,
     required this.phMin,
     required this.phMax,
+    required this.ecMin,
+    required this.ecMax,
   });
 
   factory PlantProfile.fromMap(Map<dynamic, dynamic> map) {
@@ -26,6 +29,8 @@ class PlantProfile {
       humMax: (map['hum_max'] as num?)?.toDouble() ?? 0.0,
       phMin: (map['ph_min'] as num?)?.toDouble() ?? 0.0,
       phMax: (map['ph_max'] as num?)?.toDouble() ?? 0.0,
+      ecMin: (map['ec_min'] as num?)?.toDouble() ?? 0.0,
+      ecMax: (map['ec_max'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -38,6 +43,8 @@ class PlantProfile {
     'hum_max': humMax,
     'ph_min': phMin,
     'ph_max': phMax,
+    'ec_min': ecMin,
+    'ec_max': ecMax,
   };
 }
 
@@ -52,6 +59,8 @@ class PlantCatalog {
       humMax: 85,
       phMin: 6.0,
       phMax: 7.0,
+      ecMin: 2.0,
+      ecMax: 3.5,
     ),
     PlantProfile(
       nombre: 'Lechuga Romana',
@@ -62,6 +71,8 @@ class PlantCatalog {
       humMax: 80,
       phMin: 5.5,
       phMax: 6.5,
+      ecMin: 1.2,
+      ecMax: 1.8,
     ),
     PlantProfile(
       nombre: 'Pimiento',
@@ -72,6 +83,8 @@ class PlantCatalog {
       humMax: 80,
       phMin: 6.0,
       phMax: 7.0,
+      ecMin: 1.8,
+      ecMax: 2.8,
     ),
     PlantProfile(
       nombre: 'Albahaca',
@@ -82,6 +95,8 @@ class PlantCatalog {
       humMax: 75,
       phMin: 5.5,
       phMax: 6.5,
+      ecMin: 1.0,
+      ecMax: 1.6,
     ),
   ];
 }

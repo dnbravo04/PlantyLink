@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import '../../core/firebase_constants.dart';
+import '../../../core/firebase_constants.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../widgets/common/app_scaffold.dart';
 
 class Esp32VinculacionScreen extends StatefulWidget {
   const Esp32VinculacionScreen({super.key});
@@ -14,7 +16,7 @@ class Esp32VinculacionScreen extends StatefulWidget {
 class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
-  bool? _exitoso; // null=esperando, true=ok, false=error
+  bool? _exitoso;
 
   @override
   void initState() {
@@ -31,25 +33,21 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
       app: Firebase.app(),
       databaseURL: kFirebaseDatabaseUrl,
     );
-    // Escucha el nodo heartbeat del ESP32
     db.ref('esp32/heartbeat').onValue.listen((event) {
       final valor = event.snapshot.value;
       if (valor != null && mounted) {
         setState(() => _exitoso = true);
         _animController.stop();
-        // Guardar vinculación
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           db.ref('usuarios/${user.uid}/esp32_vinculado').set(true);
         }
-        // Ir al dashboard después de 1.5s
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
         });
       }
     });
 
-    // Timeout de 30 segundos
     Future.delayed(const Duration(seconds: 30), () {
       if (mounted && _exitoso == null) {
         setState(() => _exitoso = false);
@@ -66,7 +64,7 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -74,19 +72,20 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
             children: [
               const SizedBox(height: 40),
               const Text(
-                'Vinculación con ESP32',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                'Vinculaci\u00f3n con ESP32',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Asegúrate de que el ESP32 esté encendido y conectado al WiFi',
+                'Aseg\u00farate de que el ESP32 est\u00e9 encendido y conectado al WiFi',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: AppColors.textMuted),
               ),
-
               const Spacer(),
-
-              // Animación / resultado
               if (_exitoso == null) ...[
                 RotationTransition(
                   turns: _animController,
@@ -110,22 +109,32 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Acerque su teléfono al ESP32',
-                  style: TextStyle(fontSize: 16),
+                  'Acerque su tel\u00e9fono al ESP32',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ] else if (_exitoso == true) ...[
                 const Icon(Icons.check_circle, color: Colors.green, size: 120),
                 const SizedBox(height: 24),
                 const Text(
-                  '¡Vinculación exitosa!',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  '\u00a1Vinculaci\u00f3n exitosa!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ] else ...[
                 const Icon(Icons.cancel, color: Colors.red, size: 120),
                 const SizedBox(height: 24),
                 const Text(
                   'No se pudo conectar. Intenta de nuevo.',
-                  style: TextStyle(fontSize: 16),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -137,10 +146,7 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
                   child: const Text('Reintentar'),
                 ),
               ],
-
               const Spacer(),
-
-              // Saltar por ahora (para testing)
               TextButton(
                 onPressed: () =>
                     Navigator.pushReplacementNamed(context, '/dashboard'),

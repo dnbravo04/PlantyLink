@@ -42,7 +42,10 @@ class SensorData {
       bombaDosificadoraBasico:
           map['bomba_dosificadora_basico'] as bool? ?? false,
       conectado: map['conectado'] as bool? ?? false,
-      timestamp: DateTime.now(),
+      timestamp: map['timestamp'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (map['timestamp'] as num).toInt())
+          : DateTime.now(),
     );
   }
 

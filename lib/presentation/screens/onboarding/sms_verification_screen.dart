@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../core/phone_utils.dart';
+import '../../../core/phone_utils.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../widgets/common/app_scaffold.dart';
 
 class SmsVerificationScreen extends StatefulWidget {
   const SmsVerificationScreen({super.key});
@@ -48,9 +50,9 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
     } on FirebaseAuthException catch (e) {
       setState(() {
         _error = switch (e.code) {
-          'invalid-verification-code' => 'Código inválido',
-          'code-expired' => 'Código expirado. Solicita uno nuevo',
-          'session-expired' => 'Sesión expirada. Intenta nuevamente',
+          'invalid-verification-code' => 'C\u00f3digo inv\u00e1lido',
+          'code-expired' => 'C\u00f3digo expirado. Solicita uno nuevo',
+          'session-expired' => 'Sesi\u00f3n expirada. Intenta nuevamente',
           _ => 'Error: ${e.message}',
         };
       });
@@ -80,10 +82,10 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
         verificationFailed: (FirebaseAuthException e) {
           setState(() {
             _error = switch (e.code) {
-              'invalid-phone-number' => 'Número de teléfono inválido',
-              'too-many-requests' => 'Demasiados intentos. Intenta más tarde',
-              'quota-exceeded' => 'Límite de SMS excedido',
-              _ => 'Error de verificación: ${e.message}',
+              'invalid-phone-number' => 'N\u00famero de tel\u00e9fono inv\u00e1lido',
+              'too-many-requests' => 'Demasiados intentos. Intenta m\u00e1s tarde',
+              'quota-exceeded' => 'L\u00edmite de SMS excedido',
+              _ => 'Error de verificaci\u00f3n: ${e.message}',
             };
           });
         },
@@ -94,7 +96,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
           });
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Código reenviado')));
+          ).showSnackBar(const SnackBar(content: Text('C\u00f3digo reenviado')));
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           setState(() {
@@ -104,7 +106,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
       );
     } catch (e) {
       setState(() {
-        _error = 'Error al reenviar código: $e';
+        _error = 'Error al reenviar c\u00f3digo: $e';
         _cargando = false;
       });
     }
@@ -112,8 +114,8 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Verificación SMS')),
+    return AppScaffold(
+      appBar: AppBar(title: const Text('Verificaci\u00f3n SMS')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -122,41 +124,44 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
             children: [
               const SizedBox(height: 40),
               const Text(
-                'Verifica tu teléfono',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+                'Verifica tu tel\u00e9fono',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Enviamos un código SMS a $_phoneNumber',
-                style: const TextStyle(color: Colors.grey),
+                'Enviamos un c\u00f3digo SMS a $_phoneNumber',
+                style: const TextStyle(color: AppColors.textMuted),
               ),
               const SizedBox(height: 32),
-
               TextField(
                 controller: _codeController,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 8,
+                  color: AppColors.textPrimary,
+                ),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  labelText: 'Código de verificación',
+                  labelText: 'C\u00f3digo de verificaci\u00f3n',
                   hintText: '123456',
                   errorText: _error,
                 ),
               ),
-
               const SizedBox(height: 24),
-
               TextButton(
                 onPressed: _cargando ? null : _resendCode,
                 child: _cargando
                     ? const CircularProgressIndicator()
-                    : const Text('Reenviar código'),
+                    : const Text('Reenviar c\u00f3digo'),
               ),
-
               const Spacer(),
-
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(

@@ -1,5 +1,6 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_constants.dart';
 import '../models/sensor_data.dart';
 import '../models/plant_profile.dart';
@@ -73,5 +74,49 @@ class FirebaseService {
       'nivel': nivel,
       'timestamp': ServerValue.timestamp,
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // User profile
+  // -------------------------------------------------------------------------
+
+  Stream<Map<String, dynamic>> get userProfileStream {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value({});
+    return _db.ref('usuarios/$uid').onValue.map((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      return Map<String, dynamic>.from(data);
+    });
+  }
+
+  Future<void> updateUserProfile(String name, String city) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.ref('usuarios/$uid').update({
+      'nombre': name,
+      'ciudad': city,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Alerts
+  // -------------------------------------------------------------------------
+
+  Stream<bool> get alertsEnabledStream {
+    return _db.ref('system/alerts_enabled').onValue.map((event) {
+      return event.snapshot.value as bool? ?? true;
+    });
+  }
+
+  Future<void> setAlertsEnabled(bool enabled) async {
+    await _db.ref('system/alerts_enabled').set(enabled);
+  }
+
+  // -------------------------------------------------------------------------
+  // Thresholds (partial update)
+  // -------------------------------------------------------------------------
+
+  Future<void> updateProfileThresholds(Map<String, dynamic> values) async {
+    await _db.ref('profile').update(values);
   }
 }

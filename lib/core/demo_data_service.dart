@@ -57,6 +57,8 @@ class DemoDataService {
       await _db.ref('profile/temp_max').set(availablePlants[0].tempMax);
       await _db.ref('profile/hum_min').set(availablePlants[0].humMin);
       await _db.ref('profile/hum_max').set(availablePlants[0].humMax);
+      await _db.ref('profile/ec_min').set(availablePlants[0].ecMin);
+      await _db.ref('profile/ec_max').set(availablePlants[0].ecMax);
 
       // Inicializar sensores
       await _updateSensors();
@@ -194,6 +196,8 @@ class DemoDataService {
     await _db.ref('profile/temp_max').set(plant.tempMax);
     await _db.ref('profile/hum_min').set(plant.humMin);
     await _db.ref('profile/hum_max').set(plant.humMax);
+    await _db.ref('profile/ec_min').set(plant.ecMin);
+    await _db.ref('profile/ec_max').set(plant.ecMax);
 
     debugPrint('🌱 Planta cambiada a: ${plant.nombre}');
   }
@@ -222,9 +226,9 @@ class DemoDataService {
     );
   }
 
-  // Obtener stream de historial
+  // Obtener stream de historial (últimos 60 registros, orden cronológico ascendente)
   Stream<List<Map<String, dynamic>>> get historyStream {
-    return _db.ref('history').limitToLast(50).onValue.map((event) {
+    return _db.ref('history').limitToLast(60).onValue.map((event) {
       final data = event.snapshot.value;
       if (data == null) return <Map<String, dynamic>>[];
       final Map<dynamic, dynamic> rawMap = data as Map<dynamic, dynamic>;
@@ -233,7 +237,7 @@ class DemoDataService {
         return raw.map((key, value) => MapEntry(key.toString(), value));
       }).toList();
       history.sort(
-        (a, b) => (b['timestamp'] as num).compareTo(a['timestamp'] as num),
+        (a, b) => (a['timestamp'] as num).compareTo(b['timestamp'] as num),
       );
       return history;
     });

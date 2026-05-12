@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../core/phone_utils.dart';
+import '../../../core/phone_utils.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../widgets/common/app_scaffold.dart';
 
 class VinculacionScreen extends StatefulWidget {
   const VinculacionScreen({super.key});
@@ -33,14 +35,14 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
 
         if (password.isEmpty || password.length < 6) {
           setState(() {
-            _error = 'La contraseña debe tener al menos 6 caracteres';
+            _error = 'La contrase\u00f1a debe tener al menos 6 caracteres';
             _cargando = false;
           });
           return;
         }
         if (password != confirmPassword) {
           setState(() {
-            _error = 'Las contraseñas no coinciden';
+            _error = 'Las contrase\u00f1as no coinciden';
             _cargando = false;
           });
           return;
@@ -62,9 +64,8 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
           }
         }
       } else {
-        // Autenticación por teléfono
         await _verifyPhoneNumber(input);
-        return; // Esperar verificación SMS
+        return;
       }
 
       if (mounted) {
@@ -73,10 +74,10 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
     } on FirebaseAuthException catch (e) {
       setState(() {
         _error = switch (e.code) {
-          'invalid-email' => 'Correo inválido',
-          'weak-password' => 'Contraseña muy débil',
-          'invalid-phone-number' => 'Número de teléfono inválido',
-          'too-many-requests' => 'Demasiados intentos. Intenta más tarde',
+          'invalid-email' => 'Correo inv\u00e1lido',
+          'weak-password' => 'Contrase\u00f1a muy d\u00e9bil',
+          'invalid-phone-number' => 'N\u00famero de tel\u00e9fono inv\u00e1lido',
+          'too-many-requests' => 'Demasiados intentos. Intenta m\u00e1s tarde',
           _ => 'Error: ${e.message}',
         };
       });
@@ -93,7 +94,6 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
     await auth.verifyPhoneNumber(
       phoneNumber: formatPhoneNumber(phoneNumber),
       verificationCompleted: (PhoneAuthCredential credential) async {
-        // Auto-verificación (Android)
         await auth.signInWithCredential(credential);
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/onboarding/perfil');
@@ -102,10 +102,10 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
       verificationFailed: (FirebaseAuthException e) {
         setState(() {
           _error = switch (e.code) {
-            'invalid-phone-number' => 'Número de teléfono inválido',
-            'too-many-requests' => 'Demasiados intentos. Intenta más tarde',
-            'quota-exceeded' => 'Límite de SMS excedido',
-            _ => 'Error de verificación: ${e.message}',
+            'invalid-phone-number' => 'N\u00famero de tel\u00e9fono inv\u00e1lido',
+            'too-many-requests' => 'Demasiados intentos. Intenta m\u00e1s tarde',
+            'quota-exceeded' => 'L\u00edmite de SMS excedido',
+            _ => 'Error de verificaci\u00f3n: ${e.message}',
           };
         });
         setState(() {
@@ -113,7 +113,6 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
         });
       },
       codeSent: (String verificationId, int? resendToken) {
-        // Navegar a pantalla de verificación SMS
         Navigator.pushNamed(
           context,
           '/onboarding/sms',
@@ -124,7 +123,6 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
         );
       },
       codeAutoRetrievalTimeout: (String verificationId) {
-        // Timeout de auto-recuperación
         setState(() {
           _cargando = false;
         });
@@ -134,7 +132,7 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppScaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -143,17 +141,19 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
             children: [
               const SizedBox(height: 40),
               const Text(
-                'Vinculación',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+                'Vinculaci\u00f3n',
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Ingresa tu correo o teléfono para comenzar',
-                style: TextStyle(color: Colors.grey),
+                'Ingresa tu correo o tel\u00e9fono para comenzar',
+                style: TextStyle(color: AppColors.textMuted),
               ),
               const SizedBox(height: 32),
-
-              // Toggle email/teléfono
               SegmentedButton<bool>(
                 segments: const [
                   ButtonSegment(
@@ -163,7 +163,7 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
                   ),
                   ButtonSegment(
                     value: false,
-                    label: Text('Teléfono'),
+                    label: Text('Tel\u00e9fono'),
                     icon: Icon(Icons.phone),
                   ),
                 ],
@@ -171,32 +171,31 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
                 onSelectionChanged: (val) =>
                     setState(() => _usandoEmail = val.first),
               ),
-
               const SizedBox(height: 24),
-
               TextField(
                 controller: _controller,
                 keyboardType: _usandoEmail
                     ? TextInputType.emailAddress
                     : TextInputType.phone,
+                style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: _usandoEmail
-                      ? 'Correo electrónico'
-                      : 'Número de teléfono',
+                      ? 'Correo electr\u00f3nico'
+                      : 'N\u00famero de tel\u00e9fono',
                   prefixIcon: Icon(_usandoEmail ? Icons.email : Icons.phone),
                   errorText: _usandoEmail ? null : _error,
                 ),
               ),
-
               if (_usandoEmail) ...[
                 const SizedBox(height: 16),
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  style: const TextStyle(color: AppColors.textPrimary),
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
-                    labelText: 'Contraseña',
+                    labelText: 'Contrase\u00f1a',
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -214,16 +213,15 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
                 TextField(
                   controller: _confirmPasswordController,
                   obscureText: _obscurePassword,
+                  style: const TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    labelText: 'Confirmar contraseña',
+                    labelText: 'Confirmar contrase\u00f1a',
                     prefixIcon: Icon(Icons.lock_outline),
                   ),
                 ),
               ],
-
               const Spacer(),
-
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
