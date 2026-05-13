@@ -163,27 +163,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         if (!_isEditingCity) _cityController.text = city;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.cardBackground,
+                AppColors.cardBackground.withValues(alpha: 0.8),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardBorder.withValues(alpha: 0.2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: AppColors.cardBorder,
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.info,
+                      AppColors.accent,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.info.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               _buildEditableRow(
                 label: 'Nombre',
                 controller: _nameController,
@@ -194,7 +228,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _saveUserProfile();
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               _buildEditableRow(
                 label: 'Ciudad',
                 controller: _cityController,
@@ -275,19 +309,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return profileAsync.when(
       data: (profile) {
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.cardBackground,
+                AppColors.cardBackground.withValues(alpha: 0.7),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardBorder.withValues(alpha: 0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              Text(
-                profile?.emoji ?? '🌱',
-                style: const TextStyle(fontSize: 28),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.success.withValues(alpha: 0.2),
+                      AppColors.success.withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    profile?.emoji ?? '🌱',
+                    style: const TextStyle(fontSize: 32),
+                  ),
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,24 +364,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     Text(
                       profile?.nombre ?? 'Sin configurar',
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Planta activa',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Planta activa',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () => Navigator.pushNamed(context, '/plantas'),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.info.withValues(alpha: 0.15),
+                      AppColors.info.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.info.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
                 child: const Text(
                   'Cambiar',
-                  style: TextStyle(color: AppColors.info, fontSize: 13),
+                  style: TextStyle(color: AppColors.info, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -345,16 +440,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _ecMax = profile.ecMax;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.cardBackground,
+                AppColors.cardBackground.withValues(alpha: 0.7),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardBorder.withValues(alpha: 0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
               _buildThresholdSlider(
                 label: 'Temperatura (°C)',
+                icon: Icons.thermostat,
+                color: AppColors.warning,
                 min: _tempMin,
                 max: _tempMax,
                 absMin: 0,
@@ -366,6 +477,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildThresholdSlider(
                 label: 'pH',
+                icon: Icons.science,
+                color: AppColors.info,
                 min: _phMin,
                 max: _phMax,
                 absMin: 0,
@@ -377,6 +490,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               _buildThresholdSlider(
                 label: 'EC (mS/cm)',
+                icon: Icons.electric_bolt,
+                color: AppColors.accent,
                 min: _ecMin,
                 max: _ecMax,
                 absMin: 0,
@@ -387,31 +502,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _ecMax = max;
                 }),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final plantRepo = ref.read(plantRepositoryProvider);
-                        plantRepo.updateThresholds({
-                          'temp_min': _tempMin,
-                          'temp_max': _tempMax,
-                          'ph_min': _phMin,
-                          'ph_max': _phMax,
-                          'ec_min': _ecMin,
-                          'ec_max': _ecMax,
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.info,
-                        foregroundColor: AppColors.textPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.info.withValues(alpha: 0.2),
+                            AppColors.info.withValues(alpha: 0.1),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.info.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
                       ),
-                      child: const Text('Guardar umbrales'),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final plantRepo = ref.read(plantRepositoryProvider);
+                          plantRepo.updateThresholds({
+                            'temp_min': _tempMin,
+                            'temp_max': _tempMax,
+                            'ph_min': _phMin,
+                            'ph_max': _phMax,
+                            'ec_min': _ecMin,
+                            'ec_max': _ecMax,
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: AppColors.info,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Guardar umbrales', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
@@ -426,7 +557,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         side: const BorderSide(color: AppColors.cardBorder),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
                       child: const Text('Restablecer'),
                     ),
@@ -447,6 +578,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildThresholdSlider({
     required String label,
+    required IconData icon,
+    required Color color,
     required double min,
     required double max,
     required double absMin,
@@ -455,35 +588,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required void Function(double min, double max) onChanged,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 4),
           Row(
             children: [
-              Text(
-                'Min: ${min.toStringAsFixed(1)}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      color.withValues(alpha: 0.2),
+                      color.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: color.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(icon, size: 18, color: color),
               ),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+                ),
+                child: Text(
+                  'Min: ${min.toStringAsFixed(1)}',
+                  style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: RangeSlider(
                   values: RangeValues(min, max),
                   min: absMin,
                   max: absMax,
                   divisions: divisions ?? (absMax - absMin).toInt() * 2,
-                  activeColor: AppColors.success,
+                  activeColor: color,
                   inactiveColor: AppColors.cardBorder,
                   onChanged: (values) => onChanged(values.start, values.end),
                 ),
               ),
-              Text(
-                'Max: ${max.toStringAsFixed(1)}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+                ),
+                child: Text(
+                  'Max: ${max.toStringAsFixed(1)}',
+                  style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -495,25 +668,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildAlertsCard(AsyncValue<bool> alertsAsync) {
     final enabled = alertsAsync.valueOrNull ?? true;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.cardBackground,
+            AppColors.cardBackground.withValues(alpha: 0.7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardBorder.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.notifications_active_outlined, color: AppColors.textSecondary),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.warning.withValues(alpha: 0.2),
+                  AppColors.warning.withValues(alpha: 0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Icon(
+              enabled ? Icons.notifications_active : Icons.notifications_off,
+              color: AppColors.warning,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
           const Expanded(
-            child: Text(
-              'Alertas activadas',
-              style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Notificaciones',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Alertas de sensores',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
             ),
           ),
           IlluminatedButton(
             label: enabled ? 'Activadas' : 'Desactivadas',
-            icon: enabled ? Icons.notifications_active : Icons.notifications_off,
+            icon: enabled ? Icons.check_circle : Icons.cancel,
             isActive: enabled,
             color: AppColors.warning,
             onTap: () => _toggleAlerts(!enabled),
@@ -528,53 +745,89 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       data: (sensor) {
         final connected = sensor.conectado ?? false;
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.cardBackground,
+                AppColors.cardBackground.withValues(alpha: 0.7),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardBorder.withValues(alpha: 0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
               Row(
                 children: [
                   Container(
-                    width: 10,
-                    height: 10,
+                    width: 12,
+                    height: 12,
                     decoration: BoxDecoration(
                       color: connected ? AppColors.success : AppColors.error,
                       shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: (connected ? AppColors.success : AppColors.error).withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Text(
                     connected ? 'ESP32 conectado' : 'ESP32 desconectado',
-                    style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              const Row(
+              const SizedBox(height: 16),
+              Row(
                 children: [
-                  Icon(Icons.info_outline, color: AppColors.textSecondary, size: 18),
-                  SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBorder.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.info_outline, color: AppColors.textSecondary, size: 16),
+                  ),
+                  const SizedBox(width: 12),
                   Text(
                     'Versión 1.0.0',
-                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () => Navigator.pushNamed(context, '/onboarding/esp32'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.info,
-                    side: const BorderSide(color: AppColors.cardBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: const BorderSide(color: AppColors.cardBorder, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Reconectar ESP32'),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.refresh, size: 18),
+                      SizedBox(width: 8),
+                      Text('Reconectar ESP32', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -592,21 +845,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildSignOutButton() {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _signOut,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.error.withValues(alpha: 0.15),
-          foregroundColor: AppColors.error,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: AppColors.error),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.error.withValues(alpha: 0.15),
+              AppColors.error.withValues(alpha: 0.05),
+            ],
           ),
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.error.withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.error.withValues(alpha: 0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: const Text(
-          'Cerrar sesión',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        child: ElevatedButton(
+          onPressed: _signOut,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppColors.error,
+            shadowColor: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.logout_rounded, size: 20),
+              SizedBox(width: 10),
+              Text(
+                'Cerrar sesión',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
         ),
       ),
     );

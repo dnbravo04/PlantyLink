@@ -68,7 +68,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
     });
 
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/onboarding/esp32');
+      Navigator.pushReplacementNamed(context, '/onboarding/welcome');
     }
   }
 

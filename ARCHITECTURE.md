@@ -108,7 +108,7 @@ Colores por actuador:
 | info           | #58A6FF   | Agua                       |
 | accent         | #238636   | Fertilizante               |
 
-NUNCA hardcodear colores. NUNCA usar gradientes.
+NUNCA hardcodear colores.
 
 ### Dashboard — Reglas estrictas
 - TODO debe ser visible SIN scroll en un teléfono estándar (360x800dp)
@@ -271,7 +271,7 @@ Si alguna respuesta es NO, corregir antes de entregar.
 - NO crear Scaffold directamente — usar AppScaffold
 - NO importar firebase_service.dart desde pantallas
 - NO crear providers fuera de app_providers.dart
-- NO usar gradientes ni efectos glass
+- NO usar efectos glass
 - NO hacer el dashboard scrollable
 - NO hardcodear strings de rutas — usar AppRoutes.xxx
 - NO mostrar EC sin aplicar la conversión de unidades
