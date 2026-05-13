@@ -5,9 +5,11 @@ import '../../domain/repositories/sensor_repository.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../providers/app_providers.dart';
+import '../providers/trend_alert_provider.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/dashboard/circular_metric.dart';
 import '../widgets/dashboard/illuminated_button.dart';
+import '../widgets/dashboard/simple_metric.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -17,7 +19,17 @@ class DashboardScreen extends ConsumerWidget {
     final sensorAsync = ref.watch(sensorProvider);
     final plantaAsync = ref.watch(plantaActivaProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
+    final visualizationModeAsync = ref.watch(visualizationModeProvider);
     final sensorRepo = ref.read(sensorRepositoryProvider);
+
+    // Verificar alertas de tendencia cuando llegan nuevos datos
+    sensorAsync.whenData((sensor) {
+      Future.microtask(() {
+        final trendNotifier = ref.read(trendAlertProvider.notifier);
+        trendNotifier.addSensorReading(sensor);
+        trendNotifier.checkTrendAlerts(profileAsync.value);
+      });
+    });
 
     return AppScaffold(
       body: SafeArea(
@@ -29,9 +41,11 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               _buildHeader(plantaAsync, sensorAsync, context),
               const SizedBox(height: 20),
-              _buildMetrics(sensorAsync, profileAsync),
+              _buildMetrics(sensorAsync, profileAsync, visualizationModeAsync),
               const SizedBox(height: 8),
               _buildAlert(sensorAsync, profileAsync),
+              const SizedBox(height: 8),
+              _buildTrendAlerts(ref),
               const SizedBox(height: 16),
               _buildPumpControls(sensorAsync, sensorRepo),
               const Spacer(),
@@ -148,6 +162,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildMetrics(
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
+    AsyncValue<String> visualizationModeAsync,
   ) {
     return sensorAsync.when(
       loading: () => const Center(
@@ -163,7 +178,14 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
       data: (sensor) {
-        final profile = profileAsync.valueOrNull;
+        final profile = profileAsync.value;
+        final mode = visualizationModeAsync.value ?? 'tecnica';
+
+        if (mode == 'sencilla') {
+          return SimpleMetricsGrid(sensor: sensor, profile: profile);
+        }
+
+        // Vista técnica (circular metrics)
         final ecRaw = sensor.conductividad ?? 0;
         final ecVal = ecRaw > 10 ? ecRaw / 1000 : ecRaw;
         return Wrap(
@@ -263,6 +285,67 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildTrendAlerts(WidgetRef ref) {
+    final trendState = ref.watch(trendAlertProvider);
+    final alerts = trendState.alerts;
+
+    if (alerts.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'Alertas de tendencia',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        ...alerts.map(
+          (alert) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.trending_up_rounded,
+                    color: AppColors.warning,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      alert.message,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.warning,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPumpControls(
     AsyncValue<SensorData> sensorAsync,
     SensorRepository sensorRepo,
@@ -282,9 +365,7 @@ class DashboardScreen extends ConsumerWidget {
         sensorAsync.when(
           loading: () => const SizedBox(
             height: 40,
-            child: Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
           error: (_, _) => const Text(
             'Error',
@@ -317,14 +398,16 @@ class DashboardScreen extends ConsumerWidget {
                 icon: Icons.science,
                 isActive: sensor.bombaDosificadoraAcido ?? false,
                 color: AppColors.warning,
-                onTap: () => sensorRepo.togglePump('bomba_dosificadora_acido', true),
+                onTap: () =>
+                    sensorRepo.togglePump('bomba_dosificadora_acido', true),
               ),
               IlluminatedButton(
                 label: 'Base',
                 icon: Icons.local_drink,
                 isActive: sensor.bombaDosificadoraBasico ?? false,
                 color: AppColors.success,
-                onTap: () => sensorRepo.togglePump('bomba_dosificadora_basico', true),
+                onTap: () =>
+                    sensorRepo.togglePump('bomba_dosificadora_basico', true),
               ),
             ],
           ),

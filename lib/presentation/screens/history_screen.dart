@@ -65,8 +65,8 @@ class HistoryScreen extends ConsumerWidget {
                   lineColor: AppColors.success,
                   history: history,
                   valueExtractor: (s) => s.temperatura ?? 0,
-                  minLimit: profileAsync.valueOrNull?.tempMin,
-                  maxLimit: profileAsync.valueOrNull?.tempMax,
+                  minLimit: profileAsync.value?.tempMin,
+                  maxLimit: profileAsync.value?.tempMax,
                 ),
                 const SizedBox(height: 20),
                 _ChartCard(
@@ -74,8 +74,8 @@ class HistoryScreen extends ConsumerWidget {
                   lineColor: AppColors.info,
                   history: history,
                   valueExtractor: (s) => s.ph ?? 0,
-                  minLimit: profileAsync.valueOrNull?.phMin,
-                  maxLimit: profileAsync.valueOrNull?.phMax,
+                  minLimit: profileAsync.value?.phMin,
+                  maxLimit: profileAsync.value?.phMax,
                 ),
                 const SizedBox(height: 20),
                 _ChartCard(
@@ -86,8 +86,8 @@ class HistoryScreen extends ConsumerWidget {
                     final raw = s.conductividad ?? 0;
                     return raw > 10 ? raw / 1000 : raw;
                   },
-                  minLimit: profileAsync.valueOrNull?.ecMin,
-                  maxLimit: profileAsync.valueOrNull?.ecMax,
+                  minLimit: profileAsync.value?.ecMin,
+                  maxLimit: profileAsync.value?.ecMax,
                 ),
               ],
             ),
@@ -127,7 +127,9 @@ class _ChartCard extends StatelessWidget {
     final bottom = minY - padding;
     final top = maxY + padding;
 
-    final adjustedMinY = minLimit != null && minLimit! < bottom ? minLimit! : bottom;
+    final adjustedMinY = minLimit != null && minLimit! < bottom
+        ? minLimit!
+        : bottom;
     final adjustedMaxY = maxLimit != null && maxLimit! > top ? maxLimit! : top;
 
     final xInterval = history.length > 6

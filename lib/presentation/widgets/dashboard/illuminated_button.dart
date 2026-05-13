@@ -14,6 +14,8 @@ class IlluminatedButton extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
   final bool isLoading;
+  final bool isAutoMode;
+  final bool isManualOverride;
 
   const IlluminatedButton({
     super.key,
@@ -23,6 +25,8 @@ class IlluminatedButton extends StatelessWidget {
     required this.color,
     this.onTap,
     this.isLoading = false,
+    this.isAutoMode = false,
+    this.isManualOverride = false,
   });
 
   @override
@@ -39,7 +43,9 @@ class IlluminatedButton extends StatelessWidget {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : AppColors.cardBackground,
+          color: isActive
+              ? color.withValues(alpha: 0.15)
+              : AppColors.cardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive ? color : AppColors.cardBorder,
@@ -68,7 +74,7 @@ class IlluminatedButton extends StatelessWidget {
                     scale: isActive ? 1.15 : 1.0,
                     duration: const Duration(milliseconds: 200),
                     child: Icon(
-                      icon,
+                      isManualOverride ? Icons.back_hand : icon,
                       color: isActive ? color : AppColors.textMuted,
                       size: 24,
                     ),
@@ -85,7 +91,49 @@ class IlluminatedButton extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  if (isAutoMode && !isManualOverride) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'AUTO',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (isManualOverride) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'MAN',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 4),
                   Container(
                     width: 8,
                     height: 8,

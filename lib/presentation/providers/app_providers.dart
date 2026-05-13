@@ -71,3 +71,10 @@ final userProfileProvider = StreamProvider<Map<String, dynamic>>((ref) {
 final alertsEnabledProvider = StreamProvider<bool>((ref) {
   return ref.watch(firebaseServiceProvider).alertsEnabledStream;
 });
+
+/// Stream of user's visualization mode ("tecnica" or "sencilla")
+final visualizationModeProvider = StreamProvider<String>((ref) {
+  return ref.watch(firebaseServiceProvider).userProfileStream.map((profile) {
+    return profile['modo_visualizacion'] as String? ?? 'tecnica';
+  });
+});
