@@ -18,6 +18,7 @@ dependencies:
   flutter_nfc_kit: ^3.6.2
   fl_chart: ^1.2.0
   intl: ^0.20.2
+  connectivity_plus: ^6.0.5
 
 dev_dependencies:
   flutter_test:

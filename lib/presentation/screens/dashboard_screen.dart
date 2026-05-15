@@ -20,6 +20,7 @@ class DashboardScreen extends ConsumerWidget {
     final plantaAsync = ref.watch(plantaActivaProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
     final visualizationModeAsync = ref.watch(visualizationModeProvider);
+    final connectivityAsync = ref.watch(connectivityProvider);
     final sensorRepo = ref.read(sensorRepositoryProvider);
 
     // Verificar alertas de tendencia cuando llegan nuevos datos
@@ -47,7 +48,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               _buildTrendAlerts(ref),
               const SizedBox(height: 16),
-              _buildPumpControls(sensorAsync, sensorRepo),
+              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync),
               const Spacer(),
             ],
           ),
@@ -349,68 +350,218 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildPumpControls(
     AsyncValue<SensorData> sensorAsync,
     SensorRepository sensorRepo,
+    AsyncValue<bool> connectivityAsync,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Control de Bombas',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          children: [
+            const Text(
+              'Control de Bombas',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            connectivityAsync.when(
+              data: (isOnline) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isOnline ? AppColors.success : AppColors.error,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  isOnline ? 'En línea' : 'Sin conexión',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        sensorAsync.when(
+        connectivityAsync.when(
           loading: () => const SizedBox(
             height: 40,
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
           error: (_, _) => const Text(
-            'Error',
+            'Error de conexión',
             style: TextStyle(color: AppColors.textSecondary),
           ),
-          data: (sensor) => GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 3.2,
-            children: [
-              IlluminatedButton(
-                label: 'Agua',
-                icon: Icons.water_drop,
-                isActive: sensor.bombaAgua ?? false,
-                color: AppColors.info,
-                onTap: () => sensorRepo.togglePump('bomba_agua', true),
+          data: (isOnline) {
+            if (!isOnline) {
+              return Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.wifi_off,
+                          color: AppColors.warning,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Controles deshabilitados - Sin conexión a internet',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  sensorAsync.when(
+                    loading: () => const SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    error: (_, _) => const Text(
+                      'Error',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    data: (sensor) => GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                      childAspectRatio: 3.2,
+                      children: [
+                        IlluminatedButton(
+                          label: 'Agua',
+                          icon: Icons.water_drop,
+                          isActive: sensor.bombaAgua ?? false,
+                          color: AppColors.info,
+                          onTap: null,
+                          isAutoMode: sensor.bombaAguaAuto ?? false,
+                          isManualOverride:
+                              sensor.bombaAguaManualOverride ?? false,
+                        ),
+                        IlluminatedButton(
+                          label: 'Fertilizante',
+                          icon: Icons.eco,
+                          isActive: sensor.bombaFertilizante ?? false,
+                          color: AppColors.accent,
+                          onTap: null,
+                          isAutoMode: sensor.bombaFertilizanteAuto ?? false,
+                          isManualOverride:
+                              sensor.bombaFertilizanteManualOverride ?? false,
+                        ),
+                        IlluminatedButton(
+                          label: 'Ácido',
+                          icon: Icons.science,
+                          isActive: sensor.bombaDosificadoraAcido ?? false,
+                          color: AppColors.warning,
+                          onTap: null,
+                          isAutoMode: sensor.dosificadoraAcidoAuto ?? false,
+                          isManualOverride:
+                              sensor.dosificadoraAcidoManualOverride ?? false,
+                        ),
+                        IlluminatedButton(
+                          label: 'Base',
+                          icon: Icons.local_drink,
+                          isActive: sensor.bombaDosificadoraBasico ?? false,
+                          color: AppColors.success,
+                          onTap: null,
+                          isAutoMode: sensor.dosificadoraBaseAuto ?? false,
+                          isManualOverride:
+                              sensor.dosificadoraBaseManualOverride ?? false,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
+            return sensorAsync.when(
+              loading: () => const SizedBox(
+                height: 40,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-              IlluminatedButton(
-                label: 'Fertilizante',
-                icon: Icons.eco,
-                isActive: sensor.bombaFertilizante ?? false,
-                color: AppColors.accent,
-                onTap: () => sensorRepo.togglePump('bomba_fertilizante', true),
+              error: (_, _) => const Text(
+                'Error',
+                style: TextStyle(color: AppColors.textSecondary),
               ),
-              IlluminatedButton(
-                label: 'Ácido',
-                icon: Icons.science,
-                isActive: sensor.bombaDosificadoraAcido ?? false,
-                color: AppColors.warning,
-                onTap: () =>
-                    sensorRepo.togglePump('bomba_dosificadora_acido', true),
+              data: (sensor) => GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 3.2,
+                children: [
+                  IlluminatedButton(
+                    label: 'Agua',
+                    icon: Icons.water_drop,
+                    isActive: sensor.bombaAgua ?? false,
+                    color: AppColors.info,
+                    onTap: () => sensorRepo.togglePump('bomba_agua', true),
+                    isAutoMode: sensor.bombaAguaAuto ?? false,
+                    isManualOverride: sensor.bombaAguaManualOverride ?? false,
+                  ),
+                  IlluminatedButton(
+                    label: 'Fertilizante',
+                    icon: Icons.eco,
+                    isActive: sensor.bombaFertilizante ?? false,
+                    color: AppColors.accent,
+                    onTap: () =>
+                        sensorRepo.togglePump('bomba_fertilizante', true),
+                    isAutoMode: sensor.bombaFertilizanteAuto ?? false,
+                    isManualOverride:
+                        sensor.bombaFertilizanteManualOverride ?? false,
+                  ),
+                  IlluminatedButton(
+                    label: 'Ácido',
+                    icon: Icons.science,
+                    isActive: sensor.bombaDosificadoraAcido ?? false,
+                    color: AppColors.warning,
+                    onTap: () =>
+                        sensorRepo.togglePump('bomba_dosificadora_acido', true),
+                    isAutoMode: sensor.dosificadoraAcidoAuto ?? false,
+                    isManualOverride:
+                        sensor.dosificadoraAcidoManualOverride ?? false,
+                  ),
+                  IlluminatedButton(
+                    label: 'Base',
+                    icon: Icons.local_drink,
+                    isActive: sensor.bombaDosificadoraBasico ?? false,
+                    color: AppColors.success,
+                    onTap: () => sensorRepo.togglePump(
+                      'bomba_dosificadora_basico',
+                      true,
+                    ),
+                    isAutoMode: sensor.dosificadoraBaseAuto ?? false,
+                    isManualOverride:
+                        sensor.dosificadoraBaseManualOverride ?? false,
+                  ),
+                ],
               ),
-              IlluminatedButton(
-                label: 'Base',
-                icon: Icons.local_drink,
-                isActive: sensor.bombaDosificadoraBasico ?? false,
-                color: AppColors.success,
-                onTap: () =>
-                    sensorRepo.togglePump('bomba_dosificadora_basico', true),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );

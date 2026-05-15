@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../core/firebase_service.dart';
 import '../../core/demo_data_service.dart';
 import '../../domain/repositories/sensor_repository.dart';
@@ -76,5 +77,12 @@ final alertsEnabledProvider = StreamProvider<bool>((ref) {
 final visualizationModeProvider = StreamProvider<String>((ref) {
   return ref.watch(firebaseServiceProvider).userProfileStream.map((profile) {
     return profile['modo_visualizacion'] as String? ?? 'tecnica';
+  });
+});
+
+/// Stream of connectivity status (true = online, false = offline)
+final connectivityProvider = StreamProvider<bool>((ref) {
+  return Connectivity().onConnectivityChanged.map((result) {
+    return result.contains(ConnectivityResult.none) == false;
   });
 });
