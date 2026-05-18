@@ -93,20 +93,33 @@ class _PlantCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Temp: ${planta.tempMin}\u2013${planta.tempMax}\u00b0C',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  ),
-                  Text(
-                    'Humedad: ${planta.humMin}\u2013${planta.humMax}%',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                    ),
                   ),
                   Text(
                     'pH: ${planta.phMin}\u2013${planta.phMax}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'EC: ${planta.ecMin}\u2013${planta.ecMax} mS/cm',
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 24),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.textMuted,
+              size: 24,
+            ),
           ],
         ),
       ),

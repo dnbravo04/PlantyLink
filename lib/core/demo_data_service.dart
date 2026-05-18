@@ -55,10 +55,15 @@ class DemoDataService {
       await _db.ref('profile/ph_max').set(availablePlants[0].phMax);
       await _db.ref('profile/temp_min').set(availablePlants[0].tempMin);
       await _db.ref('profile/temp_max').set(availablePlants[0].tempMax);
-      await _db.ref('profile/hum_min').set(availablePlants[0].humMin);
-      await _db.ref('profile/hum_max').set(availablePlants[0].humMax);
       await _db.ref('profile/ec_min').set(availablePlants[0].ecMin);
       await _db.ref('profile/ec_max').set(availablePlants[0].ecMax);
+      await _db
+          .ref('profile/nivel_agua_min')
+          .set(availablePlants[0].nivelAguaMin);
+      await _db
+          .ref('profile/nivel_fertilizante_min')
+          .set(availablePlants[0].nivelFertilizanteMin);
+      await _db.ref('profile/fuente').set(availablePlants[0].fuente);
 
       // Inicializar sensores
       await _updateSensors();
@@ -194,10 +199,13 @@ class DemoDataService {
     await _db.ref('profile/ph_max').set(plant.phMax);
     await _db.ref('profile/temp_min').set(plant.tempMin);
     await _db.ref('profile/temp_max').set(plant.tempMax);
-    await _db.ref('profile/hum_min').set(plant.humMin);
-    await _db.ref('profile/hum_max').set(plant.humMax);
     await _db.ref('profile/ec_min').set(plant.ecMin);
     await _db.ref('profile/ec_max').set(plant.ecMax);
+    await _db.ref('profile/nivel_agua_min').set(plant.nivelAguaMin);
+    await _db
+        .ref('profile/nivel_fertilizante_min')
+        .set(plant.nivelFertilizanteMin);
+    await _db.ref('profile/fuente').set(plant.fuente);
 
     debugPrint('🌱 Planta cambiada a: ${plant.nombre}');
   }
