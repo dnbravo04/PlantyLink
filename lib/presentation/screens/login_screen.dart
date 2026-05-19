@@ -96,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
       codeSent: (String verificationId, int? resendToken) {
         Navigator.pushNamed(
           context,
-          '/onboarding/sms',
+          '/onboarding/otp',
           arguments: {
             'verificationId': verificationId,
             'phoneNumber': phoneNumber,

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import '../../../core/firebase_constants.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
+import '../../../core/firebase_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/common/app_scaffold.dart';
 
@@ -17,6 +15,10 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   bool? _exitoso;
+  bool _isScanning = false;
+  bool _isNfcAvailable = false;
+  String? _esp32Id;
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   void initState() {
@@ -25,35 +27,84 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat();
-    _escucharESP32();
+    _checkNfcAvailability();
   }
 
-  void _escucharESP32() {
-    final db = FirebaseDatabase.instanceFor(
-      app: Firebase.app(),
-      databaseURL: kFirebaseDatabaseUrl,
-    );
-    db.ref('esp32/heartbeat').onValue.listen((event) {
-      final valor = event.snapshot.value;
-      if (valor != null && mounted) {
-        setState(() => _exitoso = true);
-        _animController.stop();
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          db.ref('usuarios/${user.uid}/esp32_vinculado').set(true);
+  Future<void> _checkNfcAvailability() async {
+    try {
+      final availability = await FlutterNfcKit.nfcAvailability;
+      if (mounted) {
+        setState(() {
+          _isNfcAvailable = availability == NFCAvailability.available;
+        });
+        if (_isNfcAvailable) {
+          _startNfcScan();
         }
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isNfcAvailable = false;
+          _exitoso = false;
+          _animController.stop();
         });
       }
+    }
+  }
+
+  Future<void> _startNfcScan() async {
+    if (!_isNfcAvailable) return;
+
+    setState(() {
+      _isScanning = true;
+      _exitoso = null;
     });
 
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted && _exitoso == null) {
-        setState(() => _exitoso = false);
-        _animController.stop();
+    try {
+      final pollResult = await FlutterNfcKit.poll(
+        timeout: const Duration(seconds: 30),
+      );
+      await _processNfcTag(pollResult);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _exitoso = false;
+          _isScanning = false;
+          _animController.stop();
+        });
       }
-    });
+    }
+  }
+
+  Future<void> _processNfcTag(NFCTag tag) async {
+    try {
+      final deviceId = tag.id;
+
+      await _firebaseService.vincularESP32(deviceId);
+
+      if (mounted) {
+        setState(() {
+          _exitoso = true;
+          _esp32Id = deviceId;
+          _isScanning = false;
+          _animController.stop();
+        });
+
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/dashboard');
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _exitoso = false;
+          _isScanning = false;
+          _animController.stop();
+        });
+      }
+    }
   }
 
   @override
@@ -80,13 +131,15 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Aseg\u00farate de que el ESP32 est\u00e9 encendido y conectado al WiFi',
+              Text(
+                _isNfcAvailable
+                    ? 'Acerca tu tel\u00e9fono al ESP32'
+                    : 'NFC no disponible en este dispositivo',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textMuted),
               ),
               const Spacer(),
-              if (_exitoso == null) ...[
+              if (_exitoso == null && _isNfcAvailable) ...[
                 RotationTransition(
                   turns: _animController,
                   child: Container(
@@ -95,28 +148,34 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: AppColors.primary,
                         width: 4,
                         strokeAlign: BorderSide.strokeAlignOutside,
                       ),
                     ),
                     child: const Icon(
-                      Icons.router,
+                      Icons.nfc,
                       size: 60,
-                      color: Colors.green,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Acerque su tel\u00e9fono al ESP32',
-                  style: TextStyle(
+                Text(
+                  _isScanning
+                      ? 'Escaneando tag NFC...'
+                      : 'Esperando tag NFC...',
+                  style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ] else if (_exitoso == true) ...[
-                const Icon(Icons.check_circle, color: Colors.green, size: 120),
+                const Icon(
+                  Icons.check_circle,
+                  color: AppColors.success,
+                  size: 120,
+                ),
                 const SizedBox(height: 24),
                 const Text(
                   '\u00a1Vinculaci\u00f3n exitosa!',
@@ -126,25 +185,41 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
                     color: AppColors.textPrimary,
                   ),
                 ),
+                if (_esp32Id != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'ID: $_esp32Id',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ] else ...[
-                const Icon(Icons.cancel, color: Colors.red, size: 120),
+                const Icon(Icons.cancel, color: AppColors.error, size: 120),
                 const SizedBox(height: 24),
-                const Text(
-                  'No se pudo conectar. Intenta de nuevo.',
-                  style: TextStyle(
+                Text(
+                  _isNfcAvailable
+                      ? 'No se detect\u00f3 el tag NFC. Intenta de nuevo.'
+                      : 'NFC no disponible',
+                  style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => setState(() {
-                    _exitoso = null;
-                    _animController.repeat();
-                    _escucharESP32();
-                  }),
-                  child: const Text('Reintentar'),
-                ),
+                if (_isNfcAvailable)
+                  FilledButton(
+                    onPressed: () {
+                      setState(() {
+                        _exitoso = null;
+                        _isScanning = false;
+                      });
+                      _animController.repeat();
+                      _startNfcScan();
+                    },
+                    child: const Text('Reintentar'),
+                  ),
               ],
               const Spacer(),
               TextButton(

@@ -122,4 +122,17 @@ class FirebaseService {
     if (uid == null) return;
     await _db.ref('usuarios/$uid').update(settings);
   }
+
+  // -------------------------------------------------------------------------
+  // ESP32 Vinculation
+  // -------------------------------------------------------------------------
+
+  Future<void> vincularESP32(String esp32Id) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await _db.ref('usuarios/$uid').update({
+      'esp32_vinculado': true,
+      'esp32_id': esp32Id,
+    });
+  }
 }
