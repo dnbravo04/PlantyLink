@@ -7,19 +7,19 @@ import 'core/demo_data_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-  } catch (e) {
-    // Firebase may already be initialized.
+  } catch (_) {
+    // Firebase may already be initialized (hot restart, etc.).
   }
 
-  // Initialize demo data and start simulation.
-  final demoService = DemoDataService();
-  await demoService.initializeDemoData();
-  demoService.startSimulation();
-  demoService.listenToControls();
+  // Start the in-memory simulation.
+  // initializeDemoData() and listenToControls() have been removed:
+  // DemoDataService no longer writes to or reads from Firebase.
+  DemoDataService().startSimulation();
 
   runApp(const ProviderScope(child: HydroTrackApp()));
 }

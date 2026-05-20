@@ -1,26 +1,31 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_constants.dart';
 import '../models/plant_profile.dart';
+import '../models/sensor_data.dart';
 
+/// Simulates hydroponics sensor data entirely in memory.
+///
+/// No Firebase reads or writes ever happen here. All data is generated
+/// locally and emitted through [sensorStream] and [historyStream].
+/// Use this service only as a development/demo fallback — never alongside
+/// active Firebase writes.
 class DemoDataService {
   static final DemoDataService _instance = DemoDataService._internal();
   factory DemoDataService() => _instance;
 
-  late FirebaseDatabase _db;
+  // ── Stream controllers ───────────────────────────────────────────────────
+  final _sensorController =
+      StreamController<SensorData>.broadcast();
+  final _historyController =
+      StreamController<List<Map<String, dynamic>>>.broadcast();
+
+  // ── Timers ───────────────────────────────────────────────────────────────
   Timer? _simulationTimer;
   Timer? _historyTimer;
   bool _isRunning = false;
-  bool _isUpdating = false;
-  final List<StreamSubscription<DatabaseEvent>> _controlSubscriptions = [];
 
-  // Plantas disponibles (referencia al catálogo centralizado)
-  List<PlantProfile> get availablePlants => PlantCatalog.plantas;
-
-  // Estado actual simulado
+  // ── In-memory sensor state ───────────────────────────────────────────────
   double _currentTemp = 24.0;
   double _currentPh = 6.8;
   double _currentConductividad = 1500.0;
@@ -31,226 +36,169 @@ class DemoDataService {
   bool _currentBombaFertilizante = false;
   bool _currentBombaAcido = false;
   bool _currentBombaBasico = false;
-  final bool _currentConectado = true;
 
-  DemoDataService._internal() {
-    _db = FirebaseDatabase.instanceFor(
-      app: Firebase.app(),
-      databaseURL: kFirebaseDatabaseUrl,
-    );
-  }
+  // ── In-memory history (max 60 entries, mirrors Firebase limitToLast(60)) ─
+  final List<Map<String, dynamic>> _history = [];
+  static const int _maxHistory = 60;
 
-  // Inicializar Firebase con datos demo
-  Future<void> initializeDemoData() async {
-    try {
-      // Guardar perfiles de plantas
-      final profilesRef = _db.ref('plant_profiles');
-      for (int i = 0; i < availablePlants.length; i++) {
-        await profilesRef.child(i.toString()).set(availablePlants[i].toMap());
-      }
+  // ── Plant catalogue ──────────────────────────────────────────────────────
+  List<PlantProfile> get availablePlants => PlantCatalog.plantas;
+  List<PlantProfile> get plants => PlantCatalog.plantas;
 
-      // Establecer planta activa inicial
-      await _db.ref('profile/planta').set(availablePlants[0].nombre);
-      await _db.ref('profile/ph_min').set(availablePlants[0].phMin);
-      await _db.ref('profile/ph_max').set(availablePlants[0].phMax);
-      await _db.ref('profile/temp_min').set(availablePlants[0].tempMin);
-      await _db.ref('profile/temp_max').set(availablePlants[0].tempMax);
-      await _db.ref('profile/ec_min').set(availablePlants[0].ecMin);
-      await _db.ref('profile/ec_max').set(availablePlants[0].ecMax);
-      await _db
-          .ref('profile/nivel_agua_min')
-          .set(availablePlants[0].nivelAguaMin);
-      await _db
-          .ref('profile/nivel_fertilizante_min')
-          .set(availablePlants[0].nivelFertilizanteMin);
-      await _db.ref('profile/fuente').set(availablePlants[0].fuente);
+  // Active plant index — kept in memory only
+  int _activePlantIndex = 0;
+  PlantProfile get activePlant => availablePlants[_activePlantIndex];
 
-      // Inicializar sensores
-      await _updateSensors();
+  DemoDataService._internal();
 
-      // Inicializar controles
-      await _db.ref('controls/bomba_agua').set(false);
-      await _db.ref('controls/bomba_fertilizante').set(false);
-      await _db.ref('controls/bomba_dosificadora_acido').set(false);
-      await _db.ref('controls/bomba_dosificadora_basico').set(false);
-      await _db.ref('controls/riego_automatico').set(true);
+  // ── Public streams ───────────────────────────────────────────────────────
 
-      debugPrint('✅ Datos demo inicializados en Firebase');
-    } catch (e) {
-      debugPrint('❌ Error inicializando datos demo: $e');
-    }
-  }
+  /// Emits a new [SensorData] snapshot every time the simulator ticks.
+  Stream<SensorData> get sensorStream => _sensorController.stream;
 
-  // Iniciar simulación de datos cambiantes
+  /// Emits the full in-memory history list (chronological) on every new entry.
+  Stream<List<Map<String, dynamic>>> get historyStream =>
+      _historyController.stream;
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
+
+  /// Starts the in-memory simulation. Safe to call multiple times.
   void startSimulation() {
     if (_isRunning) return;
     _isRunning = true;
 
-    // Actualizar sensores cada 3 segundos
+    // Emit an immediate snapshot so the UI has data before the first tick.
+    _emitSensorSnapshot();
+
+    // Sensor tick every 3 s
     _simulationTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       _simulateSensorChanges();
     });
 
-    // Guardar historial cada 10 segundos
+    // History entry every 10 s
     _historyTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      _saveToHistory();
+      _appendHistory();
     });
 
-    debugPrint('🔄 Simulación iniciada');
+    debugPrint('🔄 DemoDataService: simulación iniciada (solo en memoria)');
   }
 
-  // Detener simulación
+  /// Stops all timers and closes the stream controllers.
   void stopSimulation() {
     _simulationTimer?.cancel();
     _historyTimer?.cancel();
-    for (final sub in _controlSubscriptions) {
-      sub.cancel();
-    }
-    _controlSubscriptions.clear();
+    _simulationTimer = null;
+    _historyTimer = null;
     _isRunning = false;
-    debugPrint('⏹️ Simulación detenida');
+    debugPrint('⏹️ DemoDataService: simulación detenida');
   }
 
-  // Simular cambios en los sensores
-  void _simulateSensorChanges() async {
-    if (_isUpdating) return;
-    _isUpdating = true;
-    try {
-      final random = math.Random();
+  /// Releases resources. Call when the service is no longer needed.
+  void dispose() {
+    stopSimulation();
+    _sensorController.close();
+    _historyController.close();
+  }
 
-      // Variar temperatura (±0.5°C)
-      _currentTemp += (random.nextDouble() - 0.5);
-      _currentTemp = _currentTemp.clamp(18.0, 30.0);
+  // ── Plant management (in-memory only) ────────────────────────────────────
 
-      // Variar pH (±0.1)
-      _currentPh += (random.nextDouble() - 0.5) * 0.2;
-      _currentPh = _currentPh.clamp(5.5, 7.5);
+  /// Switches the active plant profile. Has no effect on Firebase.
+  void changePlant(int index) {
+    if (index < 0 || index >= availablePlants.length) return;
+    _activePlantIndex = index;
+    debugPrint('🌱 DemoDataService: planta activa → ${activePlant.nombre}');
+    // Emit a fresh snapshot so listeners reflect the new profile immediately.
+    _emitSensorSnapshot();
+  }
 
-      // Variar conductividad (±50)
-      _currentConductividad += (random.nextDouble() - 0.5) * 100;
-      _currentConductividad = _currentConductividad.clamp(800.0, 2200.0);
+  // ── Pump toggle (in-memory only) ─────────────────────────────────────────
 
-      // Variar nivel de agua (±2%)
-      _currentNivelAgua += (random.nextDouble() - 0.5) * 4;
-      _currentNivelAgua = _currentNivelAgua.clamp(10.0, 100.0);
-
-      // Variar nivel de fertilizante (±2%)
-      _currentNivelFertilizante += (random.nextDouble() - 0.5) * 4;
-      _currentNivelFertilizante = _currentNivelFertilizante.clamp(10.0, 100.0);
-
-      // Simular nivel de agua bajo aleatoriamente
-      if (random.nextDouble() < 0.05) {
-        _currentNivelAguaBool = false;
-      } else if (_currentNivelAgua > 30) {
-        _currentNivelAguaBool = true;
-      }
-
-      await _updateSensors();
-    } finally {
-      _isUpdating = false;
+  /// Simulates toggling a pump. State is kept in memory only.
+  void togglePump(String pumpId, bool active) {
+    switch (pumpId) {
+      case 'bomba_agua':
+        _currentBombaAgua = active;
+      case 'bomba_fertilizante':
+        _currentBombaFertilizante = active;
+      case 'bomba_dosificadora_acido':
+        _currentBombaAcido = active;
+      case 'bomba_dosificadora_basico':
+        _currentBombaBasico = active;
+      default:
+        debugPrint('⚠️ DemoDataService: pumpId desconocido: $pumpId');
+        return;
     }
+    _emitSensorSnapshot();
   }
 
-  // Actualizar datos en Firebase (escritura atómica)
-  Future<void> _updateSensors() async {
-    try {
-      await _db.ref('sensors').update({
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  void _simulateSensorChanges() {
+    final rng = math.Random();
+
+    _currentTemp += (rng.nextDouble() - 0.5);
+    _currentTemp = _currentTemp.clamp(18.0, 30.0);
+
+    _currentPh += (rng.nextDouble() - 0.5) * 0.2;
+    _currentPh = _currentPh.clamp(5.5, 7.5);
+
+    _currentConductividad += (rng.nextDouble() - 0.5) * 100;
+    _currentConductividad = _currentConductividad.clamp(800.0, 2200.0);
+
+    _currentNivelAgua += (rng.nextDouble() - 0.5) * 4;
+    _currentNivelAgua = _currentNivelAgua.clamp(10.0, 100.0);
+
+    _currentNivelFertilizante += (rng.nextDouble() - 0.5) * 4;
+    _currentNivelFertilizante = _currentNivelFertilizante.clamp(10.0, 100.0);
+
+    // Occasionally simulate a low-water alert
+    if (rng.nextDouble() < 0.05) {
+      _currentNivelAguaBool = false;
+    } else if (_currentNivelAgua > 30) {
+      _currentNivelAguaBool = true;
+    }
+
+    _emitSensorSnapshot();
+  }
+
+  void _emitSensorSnapshot() {
+    if (_sensorController.isClosed) return;
+    _sensorController.add(
+      SensorData.fromMap({
         'temperatura': _currentTemp,
-        'nivel_agua_tanque': _currentNivelAgua,
-        'nivel_fertilizante_tanque': _currentNivelFertilizante,
         'ph': _currentPh,
         'conductividad': _currentConductividad,
+        'nivel_agua_tanque': _currentNivelAgua,
+        'nivel_fertilizante_tanque': _currentNivelFertilizante,
         'nivel_agua': _currentNivelAguaBool,
         'bomba_agua': _currentBombaAgua,
         'bomba_fertilizante': _currentBombaFertilizante,
         'bomba_dosificadora_acido': _currentBombaAcido,
         'bomba_dosificadora_basico': _currentBombaBasico,
-        'conectado': _currentConectado,
-      });
-    } catch (e) {
-      debugPrint('❌ Error actualizando sensores: $e');
+        'conectado': true,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      }),
+    );
+  }
+
+  void _appendHistory() {
+    if (_historyController.isClosed) return;
+
+    final entry = <String, dynamic>{
+      'temperatura': _currentTemp,
+      'ph': _currentPh,
+      'conductividad': _currentConductividad,
+      'nivel_agua_tanque': _currentNivelAgua,
+      'nivel_fertilizante_tanque': _currentNivelFertilizante,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    _history.add(entry);
+    // Keep list bounded, drop oldest entries
+    if (_history.length > _maxHistory) {
+      _history.removeAt(0);
     }
+
+    _historyController.add(List.unmodifiable(_history));
   }
-
-  // Guardar en historial
-  Future<void> _saveToHistory() async {
-    try {
-      final historyRef = _db.ref('history').push();
-      await historyRef.set({
-        'temperatura': _currentTemp,
-        'ph': _currentPh,
-        'conductividad': _currentConductividad,
-        'nivel_agua_tanque': _currentNivelAgua,
-        'nivel_fertilizante_tanque': _currentNivelFertilizante,
-        'timestamp': ServerValue.timestamp,
-      });
-    } catch (e) {
-      debugPrint('❌ Error guardando historial: $e');
-    }
-  }
-
-  // Cambiar planta activa
-  Future<void> changePlant(int index) async {
-    if (index < 0 || index >= availablePlants.length) return;
-
-    final plant = availablePlants[index];
-    await _db.ref('profile/planta').set(plant.nombre);
-    await _db.ref('profile/ph_min').set(plant.phMin);
-    await _db.ref('profile/ph_max').set(plant.phMax);
-    await _db.ref('profile/temp_min').set(plant.tempMin);
-    await _db.ref('profile/temp_max').set(plant.tempMax);
-    await _db.ref('profile/ec_min').set(plant.ecMin);
-    await _db.ref('profile/ec_max').set(plant.ecMax);
-    await _db.ref('profile/nivel_agua_min').set(plant.nivelAguaMin);
-    await _db
-        .ref('profile/nivel_fertilizante_min')
-        .set(plant.nivelFertilizanteMin);
-    await _db.ref('profile/fuente').set(plant.fuente);
-
-    debugPrint('🌱 Planta cambiada a: ${plant.nombre}');
-  }
-
-  // Escuchar cambios en controles (para que los botones funcionen)
-  void listenToControls() {
-    _controlSubscriptions.add(
-      _db.ref('controls/bomba_agua').onValue.listen((event) {
-        _currentBombaAgua = event.snapshot.value as bool? ?? false;
-      }),
-    );
-    _controlSubscriptions.add(
-      _db.ref('controls/bomba_fertilizante').onValue.listen((event) {
-        _currentBombaFertilizante = event.snapshot.value as bool? ?? false;
-      }),
-    );
-    _controlSubscriptions.add(
-      _db.ref('controls/bomba_dosificadora_acido').onValue.listen((event) {
-        _currentBombaAcido = event.snapshot.value as bool? ?? false;
-      }),
-    );
-    _controlSubscriptions.add(
-      _db.ref('controls/bomba_dosificadora_basico').onValue.listen((event) {
-        _currentBombaBasico = event.snapshot.value as bool? ?? false;
-      }),
-    );
-  }
-
-  // Obtener stream de historial (últimos 60 registros, orden cronológico ascendente)
-  Stream<List<Map<String, dynamic>>> get historyStream {
-    return _db.ref('history').limitToLast(60).onValue.map((event) {
-      final data = event.snapshot.value;
-      if (data == null) return <Map<String, dynamic>>[];
-      final Map<dynamic, dynamic> rawMap = data as Map<dynamic, dynamic>;
-      final history = rawMap.values.map((item) {
-        final Map<dynamic, dynamic> raw = item as Map<dynamic, dynamic>;
-        return raw.map((key, value) => MapEntry(key.toString(), value));
-      }).toList();
-      history.sort(
-        (a, b) => (a['timestamp'] as num).compareTo(b['timestamp'] as num),
-      );
-      return history;
-    });
-  }
-
-  // Obtener lista de plantas disponibles
-  List<PlantProfile> get plants => PlantCatalog.plantas;
 }
