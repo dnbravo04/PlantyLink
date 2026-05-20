@@ -96,7 +96,7 @@ class _NfcVinculationScreenState extends ConsumerState<NfcVinculationScreen> {
           app: Firebase.app(),
         );
 
-        // Registrar vinculación
+        // Log opcional en nfc/registros (no usado para vinculación)
         await db.ref('nfc/registros').push().set({
           'usuario': user.uid,
           'nivel': 1,
@@ -107,7 +107,7 @@ class _NfcVinculationScreenState extends ConsumerState<NfcVinculationScreen> {
         // Actualizar estado del usuario
         await db.ref('usuarios/${user.uid}').update({
           'esp32_vinculado': true,
-          'device_id': deviceId,
+          'esp32_id': deviceId,
         });
       }
 

@@ -115,7 +115,7 @@ class _VinculacionScreenState extends State<VinculacionScreen> {
       codeSent: (String verificationId, int? resendToken) {
         Navigator.pushNamed(
           context,
-          '/onboarding/sms',
+          '/onboarding/otp',
           arguments: {
             'verificationId': verificationId,
             'phoneNumber': phoneNumber,

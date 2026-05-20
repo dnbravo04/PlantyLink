@@ -22,7 +22,7 @@ sealed class AppRoutes {
   static const String onboardingPerfil = '/onboarding/perfil';
   static const String onboardingWelcome = '/onboarding/welcome';
   static const String onboardingEsp32 = '/onboarding/esp32';
-  static const String onboardingSms = '/onboarding/sms';
+  static const String onboardingOtp = '/onboarding/otp';
   static const String onboardingVinculacion = '/onboarding/vinculacion';
 }
 
@@ -51,7 +51,7 @@ class HydroTrackApp extends StatelessWidget {
         AppRoutes.onboardingPerfil: (context) => const PerfilScreen(),
         AppRoutes.onboardingWelcome: (context) => const WelcomeScreen(),
         AppRoutes.onboardingEsp32: (context) => const Esp32VinculacionScreen(),
-        AppRoutes.onboardingSms: (context) => const SmsVerificationScreen(),
+        AppRoutes.onboardingOtp: (context) => const SmsVerificationScreen(),
         AppRoutes.onboardingVinculacion: (context) => const VinculacionScreen(),
       },
     );
