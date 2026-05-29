@@ -1,27 +1,44 @@
-import '../../core/firebase_service.dart';
+import 'dart:async';
 import '../../core/demo_data_service.dart';
+import '../../core/services/sensor_stream_service.dart';
+import '../../core/services/control_service.dart';
+import '../../core/services/history_service.dart';
 import '../../models/sensor_data.dart';
 import '../../domain/repositories/sensor_repository.dart';
 
 /// Routes sensor streams to either Firebase (production) or
 /// [DemoDataService] (development/demo fallback).
 ///
-/// Exactly one source is active at a time:
-///   - [_demo] != null  →  all streams come from in-memory simulation.
-///   - [_demo] == null  →  all streams come from Firebase.
+/// In production mode ([demoService] is null):
+///   - [sensorStream] reads live from Firebase `sensors/`.
+///   - [historyStream] reads from Firebase `history/` via [HistoryService].
+///   - A periodic recorder writes sensor snapshots to `history/` every 30 s
+///     so the history screen has data even when the ESP32 doesn't archive it.
 ///
-/// Firebase is never written to by [DemoDataService].
+/// In demo mode ([demoService] is non-null):
+///   - All data comes from in-memory simulation.
+///   - No Firebase reads or writes ever occur.
 class SensorRepositoryImpl implements SensorRepository {
-  final FirebaseService _firebase;
+  final SensorStreamService _sensorService;
+  final ControlService _controlService;
+  final HistoryService _historyService;
   final DemoDataService? _demo;
 
-  /// Set [demoService] only in development/demo builds.
-  /// Leave it null in production so Firebase is used exclusively.
+  // ── Production history recorder ──────────────────────────────────────────
+  StreamSubscription<SensorData>? _historyWriterSub;
+  DateTime? _lastHistoryWrite;
+
   SensorRepositoryImpl({
-    required FirebaseService firebaseService,
+    required SensorStreamService sensorStreamService,
+    required ControlService controlService,
+    required HistoryService historyService,
     DemoDataService? demoService,
-  })  : _firebase = firebaseService,
-        _demo = demoService;
+  })  : _sensorService = sensorStreamService,
+        _controlService = controlService,
+        _historyService = historyService,
+        _demo = demoService {
+    if (!_isDemoMode) _startHistoryRecorder();
+  }
 
   bool get _isDemoMode => _demo != null;
 
@@ -29,7 +46,7 @@ class SensorRepositoryImpl implements SensorRepository {
 
   @override
   Stream<SensorData> get sensorStream =>
-      _isDemoMode ? _demo!.sensorStream : _firebase.sensorStream;
+      _isDemoMode ? _demo!.sensorStream : _sensorService.sensorStream;
 
   @override
   Stream<List<SensorData>> get historyStream {
@@ -38,16 +55,8 @@ class SensorRepositoryImpl implements SensorRepository {
         (list) => list.map(SensorData.fromMap).toList(),
       );
     }
-    // Firebase history — adapt however FirebaseService exposes it.
-    // If FirebaseService has its own historyStream, prefer that; otherwise
-    // derive a single-item list from the live sensor stream as a placeholder.
-    return _firebase.sensorStream.map((data) => [data]);
+    return _historyService.historyStream;
   }
-
-  // ── Pump / automation controls ───────────────────────────────────────────
-  //
-  // In demo mode the pump toggle is reflected locally (in-memory).
-  // In production it goes through Firebase.
 
   @override
   Future<void> togglePump(String pumpId, bool active) async {
@@ -55,15 +64,17 @@ class SensorRepositoryImpl implements SensorRepository {
       _demo!.togglePump(pumpId, active);
       return;
     }
+    // Map repository pump IDs to Firebase control keys.
+    // Throws ArgumentError for unknown IDs — callers must handle.
     switch (pumpId) {
       case 'bomba_agua':
-        await _firebase.controlarBombaAgua(active);
+        await _controlService.setPump('bomba_agua', active);
       case 'bomba_fertilizante':
-        await _firebase.controlarBombaFertilizante(active);
+        await _controlService.setPump('bomba_fertilizante', active);
       case 'bomba_dosificadora_acido':
-        await _firebase.controlarDosificadoraAcido(active);
+        await _controlService.setPump('bomba_dosificadora_acido', active);
       case 'bomba_dosificadora_basico':
-        await _firebase.controlarDosificadoraBasico(active);
+        await _controlService.setPump('bomba_dosificadora_basico', active);
       default:
         throw ArgumentError('Unknown pumpId: $pumpId');
     }
@@ -71,10 +82,32 @@ class SensorRepositoryImpl implements SensorRepository {
 
   @override
   Future<void> setAutoWatering(bool active) async {
-    if (_isDemoMode) {
-      // Auto-watering is a Firebase-only concept; ignore in demo mode.
-      return;
-    }
-    await _firebase.activarRiegoAutomatico(active);
+    if (_isDemoMode) return; // Auto-watering is a Firebase-only concept.
+    await _controlService.setAutoWatering(active);
+  }
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
+
+  /// Cancel the background history recorder. Called by the Riverpod provider
+  /// via [ref.onDispose].
+  void dispose() {
+    _historyWriterSub?.cancel();
+    _historyWriterSub = null;
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────────
+
+  /// Subscribe to the live sensor stream and write a snapshot to `history/`
+  /// at most once every 30 s in production mode.
+  void _startHistoryRecorder() {
+    _historyWriterSub = _sensorService.sensorStream.listen((data) {
+      final now = DateTime.now();
+      if (_lastHistoryWrite == null ||
+          now.difference(_lastHistoryWrite!) >=
+              const Duration(seconds: 30)) {
+        _lastHistoryWrite = now;
+        _historyService.appendSensorReading(data); // fire-and-forget OK
+      }
+    });
   }
 }

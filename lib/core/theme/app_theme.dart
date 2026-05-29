@@ -1,104 +1,159 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
+import 'app_color_scheme.dart';
 
-/// Centralized theme configuration for HydroTracker.
+/// Centralized theme configuration for PlantyLink.
 sealed class AppTheme {
   AppTheme._();
 
-  /// Material ThemeData for the app.
-  static ThemeData get darkTheme => ThemeData(
-        brightness: Brightness.dark,
-        useMaterial3: true,
-        colorSchemeSeed: Colors.green,
-        scaffoldBackgroundColor: AppColors.background,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.background,
-          elevation: 0,
-          centerTitle: true,
-          iconTheme: IconThemeData(color: AppColors.textPrimary),
-          titleTextStyle: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+  static ThemeData get darkTheme  => _build(AppColors.dark);
+  static ThemeData get lightTheme => _build(AppColors.light);
+
+  static ThemeData _build(AppColorScheme c) {
+    final base = ThemeData(
+      brightness: c.brightness,
+      useMaterial3: true,
+      colorSchemeSeed: c.primary,
+      scaffoldBackgroundColor: c.background,
+    );
+
+    return base.copyWith(
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(base.textTheme).copyWith(
+        headlineLarge: GoogleFonts.plusJakartaSans(
+          fontSize: 28, fontWeight: FontWeight.bold, color: c.textPrimary,
+        ),
+        titleLarge: GoogleFonts.plusJakartaSans(
+          fontSize: 20, fontWeight: FontWeight.w700, color: c.textPrimary,
+        ),
+        titleMedium: GoogleFonts.plusJakartaSans(
+          fontSize: 15, fontWeight: FontWeight.w600, color: c.textPrimary,
+        ),
+        bodyLarge: GoogleFonts.plusJakartaSans(
+          fontSize: 15, fontWeight: FontWeight.w500, color: c.textPrimary,
+        ),
+        bodyMedium: GoogleFonts.plusJakartaSans(
+          fontSize: 14, fontWeight: FontWeight.w400, color: c.textSecondary,
+        ),
+        labelLarge: GoogleFonts.plusJakartaSans(
+          fontSize: 11, fontWeight: FontWeight.w600, color: c.textSecondary,
+        ),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: c.background,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: c.textPrimary),
+        titleTextStyle: GoogleFonts.plusJakartaSans(
+          color: c.textPrimary, fontSize: 18, fontWeight: FontWeight.w600,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: c.cardBackground,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.cardBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.cardBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(14)),
+          borderSide: BorderSide(color: c.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c.error, width: 2),
+        ),
+        labelStyle: TextStyle(color: c.textMuted),
+        hintStyle: TextStyle(color: c.textMuted),
+        prefixIconColor: c.textMuted,
+        suffixIconColor: c.textMuted,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontSize: 15, fontWeight: FontWeight.w700,
           ),
         ),
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
-          titleMedium: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-          bodyMedium: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-          labelLarge: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+          side: BorderSide(color: c.cardBorder, width: 1.5),
+          textStyle: GoogleFonts.plusJakartaSans(
+            fontSize: 15, fontWeight: FontWeight.w600,
           ),
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: AppColors.cardBackground,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          focusedBorder: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide(
-              color: AppColors.success,
-              width: 2,
-            ),
-          ),
-          labelStyle: const TextStyle(color: AppColors.textMuted),
-          prefixIconColor: AppColors.textMuted,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? c.primary : c.textMuted),
+        trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? c.primary.withValues(alpha: 0.3)
+                : c.cardBorder),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: c.cardBackground,
+          foregroundColor: c.textSecondary,
+          selectedForegroundColor: c.textPrimary,
+          selectedBackgroundColor: c.primary.withValues(alpha: 0.2),
+          side: BorderSide(color: c.cardBorder),
         ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: c.cardBackground,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: c.primary.withValues(alpha: 0.15),
+        elevation: 0,
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
+          color: states.contains(WidgetState.selected) ? c.primary : c.textMuted,
+        )),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) =>
+            GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w400,
+              color: states.contains(WidgetState.selected)
+                  ? c.primary
+                  : c.textMuted,
+            )),
+      ),
+      dividerTheme: DividerThemeData(
+        color: c.cardBorder,
+        thickness: 1,
+        space: 0,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: c.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: c.cardBackground,
+        contentTextStyle: GoogleFonts.plusJakartaSans(
+          color: c.textPrimary, fontSize: 14,
         ),
-        switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return AppColors.accent;
-            }
-            return AppColors.textMuted;
-          }),
-          trackColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return AppColors.accent.withValues(alpha: 0.3);
-            }
-            return AppColors.cardBorder;
-          }),
-        ),
-        segmentedButtonTheme: SegmentedButtonThemeData(
-          style: SegmentedButton.styleFrom(
-            backgroundColor: AppColors.cardBackground,
-            foregroundColor: AppColors.textSecondary,
-            selectedForegroundColor: AppColors.textPrimary,
-            selectedBackgroundColor: AppColors.success.withValues(alpha: 0.2),
-            side: const BorderSide(color: AppColors.cardBorder),
-          ),
-        ),
-      );
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 }

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l c:/repositorios/HydroTracker/lib/presentation/widgets/dashboard/*.dart)",
+      "Bash(flutter analyze:*)"
+    ]
+  }
+}

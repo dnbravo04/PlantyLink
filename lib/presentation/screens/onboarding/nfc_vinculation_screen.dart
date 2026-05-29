@@ -119,7 +119,7 @@ class _NfcVinculationScreenState extends ConsumerState<NfcVinculationScreen> {
       // Navegar al dashboard después de 2 segundos
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          Navigator.pushReplacementNamed(context, '/');
         }
       });
     } catch (e) {
@@ -282,7 +282,7 @@ class _NfcVinculationScreenState extends ConsumerState<NfcVinculationScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () =>
-                    Navigator.pushReplacementNamed(context, '/dashboard'),
+                    Navigator.pushReplacementNamed(context, '/'),
                 child: Text(
                   'Omitir por ahora',
                   style: TextStyle(color: AppColors.textMuted),

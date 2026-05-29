@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app.dart';
+import 'core/app_config.dart';
 import 'core/demo_data_service.dart';
 
 void main() async {
@@ -16,10 +17,11 @@ void main() async {
     // Firebase may already be initialized (hot restart, etc.).
   }
 
-  // Start the in-memory simulation.
-  // initializeDemoData() and listenToControls() have been removed:
-  // DemoDataService no longer writes to or reads from Firebase.
-  DemoDataService().startSimulation();
+  // Start in-memory simulation only in demo mode.
+  // In production (kDemoMode = false) no demo data is generated.
+  if (kDemoMode) {
+    DemoDataService().startSimulation();
+  }
 
-  runApp(const ProviderScope(child: HydroTrackApp()));
+  runApp(const ProviderScope(child: PlantyLinkApp()));
 }

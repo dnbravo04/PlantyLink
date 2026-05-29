@@ -1,6 +1,6 @@
 {
-    "name": "hydrotracker",
-    "short_name": "hydrotracker",
+    "name": "PlantyLink",
+    "short_name": "PlantyLink",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

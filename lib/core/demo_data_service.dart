@@ -7,18 +7,19 @@ import '../models/sensor_data.dart';
 /// Simulates hydroponics sensor data entirely in memory.
 ///
 /// No Firebase reads or writes ever happen here. All data is generated
-/// locally and emitted through [sensorStream] and [historyStream].
-/// Use this service only as a development/demo fallback — never alongside
-/// active Firebase writes.
+/// locally and emitted through [sensorStream], [historyStream], and
+/// [activePlantStream]. Use this service only as a development/demo fallback
+/// — never alongside active Firebase writes.
 class DemoDataService {
   static final DemoDataService _instance = DemoDataService._internal();
   factory DemoDataService() => _instance;
 
   // ── Stream controllers ───────────────────────────────────────────────────
-  final _sensorController =
-      StreamController<SensorData>.broadcast();
+  final _sensorController = StreamController<SensorData>.broadcast();
   final _historyController =
       StreamController<List<Map<String, dynamic>>>.broadcast();
+  // Emits whenever the active plant changes.
+  final _plantController = StreamController<PlantProfile>.broadcast();
 
   // ── Timers ───────────────────────────────────────────────────────────────
   Timer? _simulationTimer;
@@ -45,7 +46,7 @@ class DemoDataService {
   List<PlantProfile> get availablePlants => PlantCatalog.plantas;
   List<PlantProfile> get plants => PlantCatalog.plantas;
 
-  // Active plant index — kept in memory only
+  // Active plant index — kept in memory only.
   int _activePlantIndex = 0;
   PlantProfile get activePlant => availablePlants[_activePlantIndex];
 
@@ -59,6 +60,24 @@ class DemoDataService {
   /// Emits the full in-memory history list (chronological) on every new entry.
   Stream<List<Map<String, dynamic>>> get historyStream =>
       _historyController.stream;
+
+  /// Emits the active [PlantProfile] whenever it changes.
+  ///
+  /// Subscribers also receive the current value immediately via [Stream.multi]
+  /// so they don't miss the initial plant even if they subscribe after
+  /// [startSimulation] was called.
+  Stream<PlantProfile> get activePlantStream {
+    final current = activePlant;
+    return Stream.multi((controller) {
+      controller.add(current);
+      final sub = _plantController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
+  }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -80,7 +99,7 @@ class DemoDataService {
       _appendHistory();
     });
 
-    debugPrint('🔄 DemoDataService: simulación iniciada (solo en memoria)');
+    debugPrint('🔄 DemoDataService: simulação iniciada (solo en memoria)');
   }
 
   /// Stops all timers and closes the stream controllers.
@@ -98,6 +117,7 @@ class DemoDataService {
     stopSimulation();
     _sensorController.close();
     _historyController.close();
+    _plantController.close();
   }
 
   // ── Plant management (in-memory only) ────────────────────────────────────
@@ -107,6 +127,9 @@ class DemoDataService {
     if (index < 0 || index >= availablePlants.length) return;
     _activePlantIndex = index;
     debugPrint('🌱 DemoDataService: planta activa → ${activePlant.nombre}');
+    if (!_plantController.isClosed) {
+      _plantController.add(activePlant);
+    }
     // Emit a fresh snapshot so listeners reflect the new profile immediately.
     _emitSensorSnapshot();
   }

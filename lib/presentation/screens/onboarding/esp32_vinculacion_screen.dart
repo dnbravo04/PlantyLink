@@ -1,33 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
-import '../../../core/firebase_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../widgets/common/app_scaffold.dart';
+import '../../../core/theme/app_color_scheme.dart';
+import '../../providers/app_providers.dart';
+import '../../widgets/common/onboarding_step_indicator.dart';
 
-class Esp32VinculacionScreen extends StatefulWidget {
+class Esp32VinculacionScreen extends ConsumerStatefulWidget {
   const Esp32VinculacionScreen({super.key});
 
   @override
-  State<Esp32VinculacionScreen> createState() => _Esp32VinculacionScreenState();
+  ConsumerState<Esp32VinculacionScreen> createState() =>
+      _Esp32VinculacionScreenState();
 }
 
-class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
+class _Esp32VinculacionScreenState
+    extends ConsumerState<Esp32VinculacionScreen>
+    with TickerProviderStateMixin {
+  // Ripple controllers (3 rings at staggered delays)
+  late List<AnimationController> _rippleControllers;
+  late List<Animation<double>>   _rippleAnimations;
+
   bool? _exitoso;
-  bool _isScanning = false;
-  bool _isNfcAvailable = false;
+  bool  _isScanning      = false;
+  bool  _isNfcAvailable  = false;
   String? _esp32Id;
-  final FirebaseService _firebaseService = FirebaseService();
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
+    _rippleControllers = List.generate(3, (i) {
+      final ctrl = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 2400),
+      );
+      Future.delayed(Duration(milliseconds: i * 600), () {
+        if (mounted) ctrl.repeat();
+      });
+      return ctrl;
+    });
+    _rippleAnimations = _rippleControllers
+        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
+        .toList();
+
     _checkNfcAvailability();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _rippleControllers) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _checkNfcAvailability() async {
@@ -37,41 +63,41 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
         setState(() {
           _isNfcAvailable = availability == NFCAvailability.available;
         });
-        if (_isNfcAvailable) {
-          _startNfcScan();
-        }
+        if (_isNfcAvailable) _startNfcScan();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isNfcAvailable = false;
           _exitoso = false;
-          _animController.stop();
+          _errorMessage = 'Error al verificar NFC: $e';
         });
+        _stopRipples();
       }
     }
   }
 
   Future<void> _startNfcScan() async {
     if (!_isNfcAvailable) return;
-
     setState(() {
-      _isScanning = true;
-      _exitoso = null;
+      _isScanning   = true;
+      _exitoso      = null;
+      _errorMessage = null;
     });
-
+    _startRipples();
     try {
-      final pollResult = await FlutterNfcKit.poll(
+      final tag = await FlutterNfcKit.poll(
         timeout: const Duration(seconds: 30),
       );
-      await _processNfcTag(pollResult);
-    } catch (e) {
+      await _processNfcTag(tag);
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _exitoso = false;
-          _isScanning = false;
-          _animController.stop();
+          _exitoso      = false;
+          _isScanning   = false;
+          _errorMessage = 'No se detectó el tag NFC. Intenta de nuevo.';
         });
+        _stopRipples();
       }
     }
   }
@@ -79,158 +105,354 @@ class _Esp32VinculacionScreenState extends State<Esp32VinculacionScreen>
   Future<void> _processNfcTag(NFCTag tag) async {
     try {
       final deviceId = tag.id;
-
-      await _firebaseService.vincularESP32(deviceId);
-
+      await ref.read(deviceServiceProvider).vincularESP32(deviceId);
       if (mounted) {
         setState(() {
-          _exitoso = true;
-          _esp32Id = deviceId;
+          _exitoso   = true;
+          _esp32Id   = deviceId;
           _isScanning = false;
-          _animController.stop();
         });
-
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
-          }
+        _stopRipples();
+        Future.delayed(const Duration(milliseconds: 1800), () {
+          if (mounted) Navigator.pushReplacementNamed(context, '/');
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _exitoso = false;
-          _isScanning = false;
-          _animController.stop();
+          _exitoso      = false;
+          _isScanning   = false;
+          _errorMessage = 'Error al vincular el ESP32. Intenta de nuevo.';
         });
+        _stopRipples();
       }
     }
   }
 
-  @override
-  void dispose() {
-    _animController.dispose();
-    super.dispose();
+  void _startRipples() {
+    for (final c in _rippleControllers) {
+      c.repeat();
+    }
+  }
+
+  void _stopRipples() {
+    for (final c in _rippleControllers) {
+      c.stop();
+      c.reset();
+    }
+  }
+
+  void _retry() {
+    setState(() {
+      _exitoso      = null;
+      _isScanning   = false;
+      _errorMessage = null;
+    });
+    _startNfcScan();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              const Text(
-                'Vinculaci\u00f3n con ESP32',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _isNfcAvailable
-                    ? 'Acerca tu tel\u00e9fono al ESP32'
-                    : 'NFC no disponible en este dispositivo',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted),
-              ),
-              const Spacer(),
-              if (_exitoso == null && _isNfcAvailable) ...[
-                RotationTransition(
-                  turns: _animController,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.primary,
-                        width: 4,
-                        strokeAlign: BorderSide.strokeAlignOutside,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.nfc,
-                      size: 60,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  _isScanning
-                      ? 'Escaneando tag NFC...'
-                      : 'Esperando tag NFC...',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ] else if (_exitoso == true) ...[
-                const Icon(
-                  Icons.check_circle,
-                  color: AppColors.success,
-                  size: 120,
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  '\u00a1Vinculaci\u00f3n exitosa!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if (_esp32Id != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'ID: $_esp32Id',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ] else ...[
-                const Icon(Icons.cancel, color: AppColors.error, size: 120),
-                const SizedBox(height: 24),
-                Text(
-                  _isNfcAvailable
-                      ? 'No se detect\u00f3 el tag NFC. Intenta de nuevo.'
-                      : 'NFC no disponible',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (_isNfcAvailable)
-                  FilledButton(
-                    onPressed: () {
-                      setState(() {
-                        _exitoso = null;
-                        _isScanning = false;
-                      });
-                      _animController.repeat();
-                      _startNfcScan();
-                    },
-                    child: const Text('Reintentar'),
-                  ),
+    final c = AppColors.of(context);
+    return Scaffold(
+      backgroundColor: c.background,
+      body: Stack(
+        children: [
+          _buildTopBackground(c),
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(c),
+                Expanded(child: _buildSheet(c)),
               ],
-              const Spacer(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBackground(AppColorScheme c) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.28,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: c.isDark
+              ? [const Color(0xFF081824), const Color(0xFF07110E)]
+              : [const Color(0xFF0891B2), const Color(0xFF0E7490)],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(AppColorScheme c) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.24,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.15),
+                ),
+                child: Icon(
+                  Icons.arrow_back_rounded,
+                  color: c.isDark ? c.textPrimary : Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Conectar dispositivo',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 26, fontWeight: FontWeight.w800,
+                color: c.isDark ? c.textPrimary : Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _isNfcAvailable
+                  ? 'Acerca tu teléfono al ESP32'
+                  : 'NFC no disponible en este dispositivo',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: c.isDark
+                    ? c.textSecondary
+                    : Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSheet(AppColorScheme c) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        child: Column(
+          children: [
+            OnboardingStepIndicator(currentStep: 3, colors: c),
+            const SizedBox(height: 32),
+
+            Expanded(child: _buildStateContent(c)),
+
+            const SizedBox(height: 24),
+
+            // Skip link
+            if (_exitoso == null || _exitoso == false) ...[
               TextButton(
                 onPressed: () =>
-                    Navigator.pushReplacementNamed(context, '/dashboard'),
-                child: const Text('Saltar por ahora'),
+                    Navigator.pushReplacementNamed(context, '/'),
+                child: Text(
+                  'Omitir por ahora  →',
+                  style: TextStyle(
+                    color: c.textMuted, fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStateContent(AppColorScheme c) {
+    if (_exitoso == true) return _buildSuccess(c);
+    if (_exitoso == false) return _buildError(c);
+    return _buildScanning(c);
+  }
+
+  // ── Scanning: ripple sonar ──────────────────────────────────────────────────
+  Widget _buildScanning(AppColorScheme c) {
+    final ringColor = c.isDark ? const Color(0xFF22D3EE) : const Color(0xFF0891B2);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 200, height: 200,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Ripple rings
+              for (int i = 0; i < 3; i++)
+                AnimatedBuilder(
+                  animation: _rippleAnimations[i],
+                  builder: (_, _) {
+                    final val = _rippleAnimations[i].value;
+                    return Opacity(
+                      opacity: (1.0 - val).clamp(0.0, 0.6),
+                      child: Container(
+                        width: 80 + val * 120,
+                        height: 80 + val * 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: ringColor,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              // Center icon
+              Container(
+                width: 80, height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ringColor.withValues(alpha: 0.12),
+                  border: Border.all(color: ringColor.withValues(alpha: 0.5), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: ringColor.withValues(alpha: 0.3),
+                      blurRadius: 20,
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.nfc_rounded, size: 40, color: ringColor),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 24),
+        Text(
+          _isScanning ? 'Escaneando...' : 'Esperando tag NFC...',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18, fontWeight: FontWeight.w700, color: c.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Mantén tu teléfono cerca del\ndispositivo ESP32',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: c.textMuted, height: 1.5),
+        ),
+      ],
+    );
+  }
+
+  // ── Success ────────────────────────────────────────────────────────────────
+  Widget _buildSuccess(AppColorScheme c) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 96, height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: c.success.withValues(alpha: 0.12),
+            border: Border.all(color: c.success.withValues(alpha: 0.4), width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: c.success.withValues(alpha: 0.3),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: Icon(Icons.check_rounded, size: 52, color: c.success),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          '¡Vinculación exitosa!',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
+          ),
+        ),
+        if (_esp32Id != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: c.cardBorder.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              'ID: $_esp32Id',
+              style: TextStyle(
+                fontSize: 12, color: c.textMuted,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          'Redirigiendo al inicio...',
+          style: TextStyle(fontSize: 13, color: c.textMuted),
+        ),
+      ],
+    );
+  }
+
+  // ── Error ──────────────────────────────────────────────────────────────────
+  Widget _buildError(AppColorScheme c) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 96, height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: c.error.withValues(alpha: 0.10),
+            border: Border.all(color: c.error.withValues(alpha: 0.4), width: 2),
+          ),
+          child: Icon(Icons.wifi_off_rounded, size: 48, color: c.error),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'No se pudo conectar',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18, fontWeight: FontWeight.w700, color: c.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _errorMessage ?? 'Intenta acercar tu teléfono nuevamente.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: c.textMuted, height: 1.5),
+        ),
+        if (_isNfcAvailable) ...[
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _retry,
+              style: FilledButton.styleFrom(
+                backgroundColor: c.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Intentar de nuevo'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
