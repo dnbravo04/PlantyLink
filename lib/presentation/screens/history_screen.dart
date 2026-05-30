@@ -15,6 +15,7 @@ class HistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(historyStreamProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
+    final c = AppColors.of(context);
 
     return AppScaffold(
       appBar: AppBar(
@@ -24,29 +25,29 @@ class HistoryScreen extends ConsumerWidget {
         elevation: 0,
       ),
       body: historyAsync.when(
-        loading: () => const Center(
+        loading: () => Center(
           child: CircularProgressIndicator(
             strokeWidth: 3,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            valueColor: AlwaysStoppedAnimation<Color>(c.primary),
           ),
         ),
         error: (error, _) => Center(
           child: Text(
             'Error: $error',
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: c.textSecondary),
           ),
         ),
         data: (history) {
           if (history.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.history, size: 64, color: Colors.white30),
-                  SizedBox(height: 16),
+                  Icon(Icons.history, size: 64, color: c.textMuted),
+                  const SizedBox(height: 16),
                   Text(
                     'No hay datos de historial',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 16),
+                    style: TextStyle(color: c.textMuted, fontSize: 16),
                   ),
                 ],
               ),
@@ -58,8 +59,8 @@ class HistoryScreen extends ConsumerWidget {
             child: Column(
               children: [
                 _ChartCard(
-                  title: 'Temperatura (\u00b0C)',
-                  lineColor: AppColors.success,
+                  title: 'Temperatura (°C)',
+                  lineColor: c.success,
                   history: history,
                   valueExtractor: (s) => s.temperatura ?? 0,
                   minLimit: profileAsync.value?.tempMin,
@@ -68,7 +69,7 @@ class HistoryScreen extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _ChartCard(
                   title: 'pH',
-                  lineColor: AppColors.info,
+                  lineColor: c.info,
                   history: history,
                   valueExtractor: (s) => s.ph ?? 0,
                   minLimit: profileAsync.value?.phMin,
@@ -77,7 +78,7 @@ class HistoryScreen extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _ChartCard(
                   title: 'Conductividad EC (mS/cm)',
-                  lineColor: AppColors.warning,
+                  lineColor: c.warning,
                   history: history,
                   valueExtractor: (s) {
                     final raw = s.conductividad ?? 0;
@@ -114,6 +115,8 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+
     final spots = List.generate(history.length, (i) {
       return FlSpot(i.toDouble(), valueExtractor(history[i]));
     });
@@ -133,14 +136,19 @@ class _ChartCard extends StatelessWidget {
         ? (history.length / 5).floorToDouble().clamp(1.0, double.infinity)
         : 1.0;
 
+    // Theme-aware grid/border colors
+    final gridColor = c.cardBorder.withValues(alpha: 0.5);
+    final limitLineColor = c.textMuted.withValues(alpha: 0.5);
+
     return AppCard(
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: c.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -158,7 +166,7 @@ class _ChartCard extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: gridColor,
                     strokeWidth: 1,
                   ),
                 ),
@@ -178,8 +186,8 @@ class _ChartCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             DateFormat('HH:mm').format(time),
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
+                            style: TextStyle(
+                              color: c.textMuted,
                               fontSize: 10,
                             ),
                           ),
@@ -194,8 +202,8 @@ class _ChartCard extends StatelessWidget {
                       getTitlesWidget: (value, meta) {
                         return Text(
                           value.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
+                          style: TextStyle(
+                            color: c.textMuted,
                             fontSize: 10,
                           ),
                         );
@@ -228,7 +236,7 @@ class _ChartCard extends StatelessWidget {
                     if (minLimit != null)
                       HorizontalLine(
                         y: minLimit!,
-                        color: Colors.white.withValues(alpha: 0.35),
+                        color: limitLineColor,
                         strokeWidth: 1,
                         dashArray: [5, 5],
                         label: HorizontalLineLabel(
@@ -236,8 +244,8 @@ class _ChartCard extends StatelessWidget {
                           alignment: Alignment.centerRight,
                           labelResolver: (line) =>
                               'Min ${minLimit!.toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
+                          style: TextStyle(
+                            color: c.textMuted,
                             fontSize: 10,
                           ),
                         ),
@@ -245,7 +253,7 @@ class _ChartCard extends StatelessWidget {
                     if (maxLimit != null)
                       HorizontalLine(
                         y: maxLimit!,
-                        color: Colors.white.withValues(alpha: 0.35),
+                        color: limitLineColor,
                         strokeWidth: 1,
                         dashArray: [5, 5],
                         label: HorizontalLineLabel(
@@ -253,8 +261,8 @@ class _ChartCard extends StatelessWidget {
                           alignment: Alignment.centerRight,
                           labelResolver: (line) =>
                               'Max ${maxLimit!.toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
+                          style: TextStyle(
+                            color: c.textMuted,
                             fontSize: 10,
                           ),
                         ),

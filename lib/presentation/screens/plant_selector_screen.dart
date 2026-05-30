@@ -25,7 +25,10 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
 
   List<PerenualSpecies> _searchResults = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String? _searchError;
+  int _currentPage = 1;
+  int _totalPages = 1;
 
   @override
   void dispose() {
@@ -41,34 +44,60 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
         _searchResults = [];
         _isLoading = false;
         _searchError = null;
+        _currentPage = 1;
+        _totalPages = 1;
       });
       return;
     }
     setState(() {
       _isLoading = true;
       _searchError = null;
+      _currentPage = 1;
+      _totalPages = 1;
     });
     _debounce = Timer(const Duration(milliseconds: 600), () => _search(query));
   }
 
   Future<void> _search(String query) async {
     try {
-      final results = await ref
+      final (:results, :totalPages) = await ref
           .read(plantCatalogRepositoryProvider)
-          .searchSpecies(query.trim());
+          .searchSpecies(query.trim(), page: 1);
       if (mounted) {
         setState(() {
           _searchResults = results;
+          _totalPages = totalPages;
+          _currentPage = 1;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _searchError = 'No se pudo conectar con Perenual API.';
+          _searchError = 'No se pudo conectar con el servicio de plantas.';
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || _currentPage >= _totalPages) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final nextPage = _currentPage + 1;
+      final (:results, totalPages: _) = await ref
+          .read(plantCatalogRepositoryProvider)
+          .searchSpecies(_searchController.text.trim(), page: nextPage);
+      if (mounted) {
+        setState(() {
+          _searchResults = [..._searchResults, ...results];
+          _currentPage = nextPage;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -76,10 +105,11 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
     final plantRepo = ref.read(plantRepositoryProvider);
     await plantRepo.selectPlant(planta);
     if (mounted) {
+      final c = AppColors.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${planta.emoji} Perfil ${planta.nombre} activado'),
-          backgroundColor: Colors.green,
+          backgroundColor: c.success,
         ),
       );
       Navigator.pop(context);
@@ -99,10 +129,11 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
               .read(plantRepositoryProvider)
               .selectPlant(plant);
           if (mounted) {
+            final c = AppColors.of(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('🌱 ${plant.nombre} activado'),
-                backgroundColor: Colors.green,
+                backgroundColor: c.success,
               ),
             );
             Navigator.pop(context); // close selector
@@ -114,19 +145,21 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
                 .read(plantCatalogRepositoryProvider)
                 .saveToUserCatalog(plant, perenualId: perenualId);
             if (mounted) {
+              final c = AppColors.of(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Planta guardada en tu catálogo'),
-                  backgroundColor: Colors.green,
+                SnackBar(
+                  content: const Text('Planta guardada en tu catálogo'),
+                  backgroundColor: c.success,
                 ),
               );
             }
           } catch (_) {
             if (mounted) {
+              final c = AppColors.of(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Error al guardar planta'),
-                  backgroundColor: Colors.red,
+                SnackBar(
+                  content: const Text('Error al guardar planta'),
+                  backgroundColor: c.error,
                 ),
               );
             }
@@ -140,6 +173,7 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final localPlants = ref.read(plantRepositoryProvider).availablePlants;
     final userCatalogAsync = ref.watch(userCatalogStreamProvider);
 
@@ -156,14 +190,14 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
-              style: const TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: c.textPrimary),
               decoration: InputDecoration(
-                hintText: 'Buscar en Perenual API...',
-                hintStyle: const TextStyle(color: AppColors.textMuted),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textMuted),
+                hintText: 'Buscar planta...',
+                hintStyle: TextStyle(color: c.textMuted),
+                prefixIcon: Icon(Icons.search, color: c.textMuted),
                 suffixIcon: _isSearchActive
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppColors.textMuted),
+                        icon: Icon(Icons.clear, color: c.textMuted),
                         onPressed: () {
                           _searchController.clear();
                           _onSearchChanged('');
@@ -171,7 +205,7 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: AppColors.cardBackground,
+                fillColor: c.cardBackground,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -186,8 +220,11 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
                 ? _SearchResultsBody(
                     results: _searchResults,
                     isLoading: _isLoading,
+                    isLoadingMore: _isLoadingMore,
+                    hasMore: _currentPage < _totalPages,
                     error: _searchError,
                     onTap: _openApiPlantSheet,
+                    onLoadMore: _loadMore,
                   )
                 : _LocalCatalogBody(
                     localPlants: localPlants,
@@ -206,20 +243,27 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
 class _SearchResultsBody extends StatelessWidget {
   final List<PerenualSpecies> results;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
   final String? error;
   final void Function(PerenualSpecies) onTap;
+  final VoidCallback onLoadMore;
 
   const _SearchResultsBody({
     required this.results,
     required this.isLoading,
+    required this.isLoadingMore,
+    required this.hasMore,
     required this.error,
     required this.onTap,
+    required this.onLoadMore,
   });
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: c.primary));
     }
     if (error != null) {
       return Center(
@@ -228,12 +272,12 @@ class _SearchResultsBody extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off, color: AppColors.textMuted, size: 48),
+              Icon(Icons.wifi_off, color: c.textMuted, size: 48),
               const SizedBox(height: 16),
               Text(
                 error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: c.textMuted),
               ),
             ],
           ),
@@ -241,20 +285,33 @@ class _SearchResultsBody extends StatelessWidget {
       );
     }
     if (results.isEmpty) {
-      return const Center(
-        child: Text(
-          'Sin resultados',
-          style: TextStyle(color: AppColors.textMuted),
-        ),
+      return Center(
+        child: Text('Sin resultados', style: TextStyle(color: c.textMuted)),
       );
     }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      itemCount: results.length,
-      itemBuilder: (_, i) => _ApiSpeciesCard(
-        species: results[i],
-        onTap: () => onTap(results[i]),
-      ),
+      itemCount: results.length + (hasMore || isLoadingMore ? 1 : 0),
+      itemBuilder: (_, i) {
+        if (i == results.length) {
+          // Pagination footer
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: isLoadingMore
+                ? Center(child: CircularProgressIndicator(color: c.primary))
+                : Center(
+                    child: OutlinedButton(
+                      onPressed: onLoadMore,
+                      child: const Text('Cargar más'),
+                    ),
+                  ),
+          );
+        }
+        return _ApiSpeciesCard(
+          species: results[i],
+          onTap: () => onTap(results[i]),
+        );
+      },
     );
   }
 }
@@ -267,6 +324,7 @@ class _ApiSpeciesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final thumb = species.defaultImage?.thumbnail;
     return GestureDetector(
       onTap: onTap,
@@ -294,8 +352,8 @@ class _ApiSpeciesCard extends StatelessWidget {
                 children: [
                   Text(
                     species.commonName.isEmpty ? 'Sin nombre' : species.commonName,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: c.textPrimary,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -304,8 +362,8 @@ class _ApiSpeciesCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       species.scientificName.first,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
+                      style: TextStyle(
+                        color: c.textMuted,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
                       ),
@@ -318,7 +376,7 @@ class _ApiSpeciesCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted),
+            Icon(Icons.chevron_right, color: c.textMuted),
           ],
         ),
       ),
@@ -371,6 +429,7 @@ class _LocalPlantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: AppCard(
@@ -382,8 +441,8 @@ class _LocalPlantCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.green.withValues(alpha: 0.3),
-                    Colors.green.withValues(alpha: 0.1),
+                    c.success.withValues(alpha: 0.25),
+                    c.success.withValues(alpha: 0.08),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(16),
@@ -397,8 +456,8 @@ class _LocalPlantCard extends StatelessWidget {
                 children: [
                   Text(
                     planta.nombre,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: c.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
@@ -406,20 +465,20 @@ class _LocalPlantCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Temp: ${planta.tempMin}–${planta.tempMax}°C',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: c.textMuted, fontSize: 13),
                   ),
                   Text(
                     'pH: ${planta.phMin}–${planta.phMax}',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: c.textMuted, fontSize: 13),
                   ),
                   Text(
                     'EC: ${planta.ecMin}–${planta.ecMax} mS/cm',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: TextStyle(color: c.textMuted, fontSize: 13),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 24),
+            Icon(Icons.chevron_right, color: c.textMuted, size: 24),
           ],
         ),
       ),
@@ -470,15 +529,16 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _enriched = EnrichedPlantProfile(base: base, perenualId: widget.species.id);
+          _enriched = EnrichedPlantProfile(
+            base: base,
+            perenualId: widget.species.id,
+          );
           _loadingEnriched = false;
         });
       }
     }
   }
 
-  /// Build a generic [PlantProfile] from the Perenual species summary.
-  /// Thresholds use standard hydroponic defaults; users can adjust in Settings.
   PlantProfile _buildBaseProfile() {
     final name = widget.species.commonName.isNotEmpty
         ? widget.species.commonName
@@ -500,6 +560,7 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final profile = _enriched;
     final base = profile?.base ?? _buildBaseProfile();
     final rec = profile != null
@@ -513,9 +574,9 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: c.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: ListView(
           controller: controller,
@@ -528,7 +589,7 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(
-                  color: AppColors.textMuted.withValues(alpha: 0.4),
+                  color: c.textMuted.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -553,18 +614,18 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
               widget.species.commonName.isEmpty
                   ? 'Planta desconocida'
                   : widget.species.commonName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
               ),
             ),
             if (widget.species.scientificName.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
                 widget.species.scientificName.first,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
+                style: TextStyle(
+                  color: c.textMuted,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -573,7 +634,7 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
             const SizedBox(height: 20),
 
             if (_loadingEnriched)
-              const Center(child: CircularProgressIndicator())
+              Center(child: CircularProgressIndicator(color: c.primary))
             else ...[
               // Description
               if (profile?.description != null) ...[
@@ -581,7 +642,7 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
                   title: 'Descripción',
                   child: Text(
                     profile!.description!,
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: c.textSecondary),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -600,10 +661,11 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
                 ],
               ),
 
+              // Quick care tips (from species detail fields)
               if (profile?.careTips.isNotEmpty == true) ...[
                 const SizedBox(height: 16),
                 _SheetSection(
-                  title: 'Consejos de cuidado',
+                  title: 'Resumen de cuidados',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: profile!.careTips
@@ -612,19 +674,30 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('• ',
-                                      style: TextStyle(
-                                          color: AppColors.primary)),
+                                  Text('• ', style: TextStyle(color: c.primary)),
                                   Expanded(
                                     child: Text(
                                       t,
-                                      style: const TextStyle(
-                                          color: AppColors.textSecondary),
+                                      style: TextStyle(color: c.textSecondary),
                                     ),
                                   ),
                                 ],
                               ),
                             ))
+                        .toList(),
+                  ),
+                ),
+              ],
+
+              // Detailed care guide sections (from /api/species-care-guide-list)
+              if (profile?.careGuideSections.isNotEmpty == true) ...[
+                const SizedBox(height: 16),
+                _SheetSection(
+                  title: 'Guía de cuidados',
+                  child: Column(
+                    children: profile!.careGuideSections
+                        .where((s) => s.description.isNotEmpty)
+                        .map((s) => _CareGuideSection(section: s))
                         .toList(),
                   ),
                 ),
@@ -640,14 +713,13 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
               const SizedBox(height: 16),
               AppCard(
                 child: Row(
-                  children: const [
-                    Icon(Icons.info_outline, color: AppColors.textMuted, size: 18),
-                    SizedBox(width: 8),
+                  children: [
+                    Icon(Icons.info_outline, color: c.textMuted, size: 18),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Los umbrales son valores estándar. Ajústalos en Configuración.',
-                        style: TextStyle(
-                            color: AppColors.textMuted, fontSize: 12),
+                        style: TextStyle(color: c.textMuted, fontSize: 12),
                       ),
                     ),
                   ],
@@ -677,6 +749,67 @@ class _ApiPlantDetailSheetState extends ConsumerState<_ApiPlantDetailSheet> {
   }
 }
 
+// ── Care guide section (expandable) ───────────────────────────────────────────
+
+class _CareGuideSection extends StatelessWidget {
+  final PerenualCareSection section;
+  const _CareGuideSection({required this.section});
+
+  static const _icons = <String, IconData>{
+    'watering':    Icons.water_drop_outlined,
+    'sunlight':    Icons.wb_sunny_outlined,
+    'fertilizing': Icons.science_outlined,
+    'pruning':     Icons.content_cut_outlined,
+    'soil':        Icons.landscape_outlined,
+    'pest':        Icons.bug_report_outlined,
+  };
+
+  static const _labels = <String, String>{
+    'watering':    'Riego',
+    'sunlight':    'Luz solar',
+    'fertilizing': 'Fertilización',
+    'pruning':     'Poda',
+    'soil':        'Suelo',
+    'pest':        'Plagas',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final type = section.type.toLowerCase();
+    final icon = _icons[type] ?? Icons.eco_outlined;
+    final label = _labels[type] ?? _capitalize(section.type);
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        leading: Icon(icon, color: c.primary, size: 20),
+        title: Text(
+          label,
+          style: TextStyle(
+            color: c.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        iconColor: c.textMuted,
+        collapsedIconColor: c.textMuted,
+        children: [
+          Text(
+            section.description,
+            style: TextStyle(color: c.textSecondary, fontSize: 13, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+
 // ── Nutrient card ──────────────────────────────────────────────────────────────
 
 class _NutrientCard extends StatelessWidget {
@@ -698,9 +831,13 @@ class _NutrientCard extends StatelessWidget {
           _InfoRow('Ratio N-P-K', rec.npkRatio),
           _InfoRow('Dosis', '${rec.doseMlPerLiter.toStringAsFixed(1)} mL/L'),
           const SizedBox(height: 6),
-          Text(rec.notes,
-              style: const TextStyle(
-                  color: AppColors.textMuted, fontSize: 12)),
+          Text(
+            rec.notes,
+            style: TextStyle(
+              color: AppColors.of(context).textMuted,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
@@ -715,12 +852,13 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, top: 4),
       child: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.textMuted,
+        style: TextStyle(
+          color: c.textMuted,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -738,13 +876,14 @@ class _SheetSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: c.textPrimary,
             fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
@@ -764,18 +903,21 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
-          Text(value,
-              style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500)),
+          Text(label, style: TextStyle(color: c.textMuted, fontSize: 13)),
+          Text(
+            value,
+            style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -788,16 +930,17 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.15),
+        color: c.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.primary,
+        style: TextStyle(
+          color: c.primary,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -809,14 +952,15 @@ class _Chip extends StatelessWidget {
 class _PlantIconBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Container(
       width: 64,
       height: 64,
       decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.15),
+        color: c.success.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Icon(Icons.eco, color: Colors.green, size: 32),
+      child: Icon(Icons.eco, color: c.success, size: 32),
     );
   }
 }

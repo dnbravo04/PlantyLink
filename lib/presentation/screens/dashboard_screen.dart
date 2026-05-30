@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_color_scheme.dart';
 import '../../domain/repositories/sensor_repository.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
@@ -17,6 +18,7 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = AppColors.of(context);
     final sensorAsync = ref.watch(sensorProvider);
     final plantaAsync = ref.watch(plantaActivaProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
@@ -45,15 +47,15 @@ class DashboardScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
-              _buildHeader(plantaAsync, sensorAsync, context),
+              _buildHeader(plantaAsync, sensorAsync, context, c),
               const SizedBox(height: 20),
-              _buildMetrics(sensorAsync, profileAsync, visualizationMode),
+              _buildMetrics(sensorAsync, profileAsync, visualizationMode, c),
               const SizedBox(height: 8),
-              _buildAlert(sensorAsync, profileAsync),
+              _buildAlert(sensorAsync, profileAsync, c),
               const SizedBox(height: 8),
-              _buildTrendAlerts(ref),
+              _buildTrendAlerts(ref, c),
               const SizedBox(height: 16),
-              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync),
+              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync, c),
               const Spacer(),
             ],
           ),
@@ -66,8 +68,8 @@ class DashboardScreen extends ConsumerWidget {
     AsyncValue<String> plantaAsync,
     AsyncValue<SensorData> sensorAsync,
     BuildContext context,
+    AppColorScheme c,
   ) {
-    final c = AppColors.of(context);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Buenos días'
@@ -124,7 +126,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEsp32Chip(AsyncValue<SensorData> sensorAsync, dynamic c) {
+  Widget _buildEsp32Chip(AsyncValue<SensorData> sensorAsync, AppColorScheme c) {
     return sensorAsync.when(
       data: (sensor) {
         final connected = sensor.conectado ?? false;
@@ -174,18 +176,19 @@ class DashboardScreen extends ConsumerWidget {
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
     String visualizationMode,
+    AppColorScheme c,
   ) {
     return sensorAsync.when(
-      loading: () => const Center(
+      loading: () => Center(
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+          valueColor: AlwaysStoppedAnimation<Color>(c.success),
         ),
       ),
-      error: (_, _) => const Center(
+      error: (_, _) => Center(
         child: Text(
           'Error de conexión',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: c.textSecondary),
         ),
       ),
       data: (sensor) {
@@ -208,7 +211,7 @@ class DashboardScreen extends ConsumerWidget {
                   value: (sensor.temperatura ?? 0).toStringAsFixed(1),
                   unit: '°C',
                   icon: Icons.thermostat_outlined,
-                  statusColor: _tempColor(sensor.temperatura ?? 0),
+                  statusColor: _tempColor(sensor.temperatura ?? 0, c),
                   isInRange: true,
                 ),
               ),
@@ -219,7 +222,7 @@ class DashboardScreen extends ConsumerWidget {
                   value: (sensor.ph ?? 0).toStringAsFixed(1),
                   unit: '',
                   icon: Icons.science_outlined,
-                  statusColor: _phColor(sensor.ph ?? 0, profile),
+                  statusColor: _phColor(sensor.ph ?? 0, profile, c),
                   isInRange: profile == null ||
                       ((sensor.ph ?? 0) >= profile.phMin &&
                           (sensor.ph ?? 0) <= profile.phMax),
@@ -234,7 +237,7 @@ class DashboardScreen extends ConsumerWidget {
                   value: ecVal.toStringAsFixed(2),
                   unit: 'mS/cm',
                   icon: Icons.electric_bolt_outlined,
-                  statusColor: _ecColor(ecVal, profile),
+                  statusColor: _ecColor(ecVal, profile, c),
                   isInRange: profile == null ||
                       (ecVal >= profile.ecMin && ecVal <= profile.ecMax),
                 ),
@@ -247,7 +250,7 @@ class DashboardScreen extends ConsumerWidget {
               sublabel: _levelLabel(sensor.nivelAguaTanque ?? 0),
               percent: sensor.nivelAguaTanque ?? 0,
               icon: Icons.water_drop_rounded,
-              color: _levelColor(sensor.nivelAguaTanque ?? 0),
+              color: _levelColor(sensor.nivelAguaTanque ?? 0, c),
             ),
             const SizedBox(height: 10),
             TankLevelCard(
@@ -255,7 +258,7 @@ class DashboardScreen extends ConsumerWidget {
               sublabel: _levelLabel(sensor.nivelFertilizanteTanque ?? 0),
               percent: sensor.nivelFertilizanteTanque ?? 0,
               icon: Icons.eco_rounded,
-              color: _levelColor(sensor.nivelFertilizanteTanque ?? 0),
+              color: _levelColor(sensor.nivelFertilizanteTanque ?? 0, c),
             ),
           ],
         );
@@ -266,6 +269,7 @@ class DashboardScreen extends ConsumerWidget {
   Widget _buildAlert(
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
+    AppColorScheme c,
   ) {
     return profileAsync.when(
       data: (profile) {
@@ -278,9 +282,9 @@ class DashboardScreen extends ConsumerWidget {
             if (!outOfRange) return const SizedBox.shrink();
             return Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.warning_amber_rounded,
-                  color: AppColors.warning,
+                  color: c.warning,
                   size: 16,
                 ),
                 const SizedBox(width: 8),
@@ -288,9 +292,9 @@ class DashboardScreen extends ConsumerWidget {
                   child: Text(
                     'EC ${ec.toStringAsFixed(2)} mS/cm fuera de rango. '
                     'Óptimo: ${profile.ecMin} – ${profile.ecMax} mS/cm',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.warning,
+                      color: c.warning,
                       fontWeight: FontWeight.w500,
                     ),
                     maxLines: 2,
@@ -309,7 +313,7 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTrendAlerts(WidgetRef ref) {
+  Widget _buildTrendAlerts(WidgetRef ref, AppColorScheme c) {
     final trendState = ref.watch(trendAlertProvider);
     final alerts = trendState.alerts;
 
@@ -318,12 +322,12 @@ class DashboardScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Alertas de tendencia',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: c.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -333,26 +337,26 @@ class DashboardScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.1),
+                color: c.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.3),
+                  color: c.warning.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.trending_up_rounded,
-                    color: AppColors.warning,
+                    color: c.warning,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       alert.message,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.warning,
+                        color: c.warning,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 2,
@@ -372,18 +376,19 @@ class DashboardScreen extends ConsumerWidget {
     AsyncValue<SensorData> sensorAsync,
     SensorRepository sensorRepo,
     AsyncValue<bool> connectivityAsync,
+    AppColorScheme c,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'Control de Bombas',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: c.textPrimary,
               ),
             ),
             const SizedBox(width: 8),
@@ -392,7 +397,7 @@ class DashboardScreen extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isOnline ? AppColors.success : AppColors.error,
+                  color: isOnline ? c.success : c.error,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -417,9 +422,9 @@ class DashboardScreen extends ConsumerWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
-          error: (_, _) => const Text(
+          error: (_, _) => Text(
             'Error de conexión',
-            style: TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: c.textSecondary),
           ),
           data: (sensor) {
             final isOnline = connectivityAsync.value ?? true;
@@ -430,22 +435,22 @@ class DashboardScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
+                      color: c.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3),
+                        color: c.warning.withValues(alpha: 0.3),
                       ),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.wifi_off, color: AppColors.warning, size: 20),
-                        SizedBox(width: 8),
+                        Icon(Icons.wifi_off, color: c.warning, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Controles deshabilitados - Sin conexión a internet',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.warning,
+                              color: c.warning,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -454,23 +459,22 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildPumpGrid(sensor, sensorRepo, enabled: false),
+                  _buildPumpGrid(sensor, sensorRepo, c, enabled: false),
                 ],
               );
             }
 
-            return _buildPumpGrid(sensor, sensorRepo, enabled: true);
+            return _buildPumpGrid(sensor, sensorRepo, c, enabled: true);
           },
         ),
       ],
     );
   }
 
-  /// Builds the 2×2 pump grid. When [enabled] is false every button's
-  /// [onTap] is null so taps are ignored while offline.
   Widget _buildPumpGrid(
     SensorData sensor,
-    SensorRepository sensorRepo, {
+    SensorRepository sensorRepo,
+    AppColorScheme c, {
     required bool enabled,
   }) {
     return GridView.count(
@@ -485,8 +489,7 @@ class DashboardScreen extends ConsumerWidget {
           label: 'Agua',
           icon: Icons.water_drop,
           isActive: sensor.bombaAgua ?? false,
-          color: AppColors.info,
-          // Toggle: pass the OPPOSITE of the current state.
+          color: c.info,
           onTap: enabled
               ? () => sensorRepo.togglePump(
                     'bomba_agua',
@@ -500,7 +503,7 @@ class DashboardScreen extends ConsumerWidget {
           label: 'Fertilizante',
           icon: Icons.eco,
           isActive: sensor.bombaFertilizante ?? false,
-          color: AppColors.accent,
+          color: c.accent,
           onTap: enabled
               ? () => sensorRepo.togglePump(
                     'bomba_fertilizante',
@@ -514,7 +517,7 @@ class DashboardScreen extends ConsumerWidget {
           label: 'Ácido',
           icon: Icons.science,
           isActive: sensor.bombaDosificadoraAcido ?? false,
-          color: AppColors.warning,
+          color: c.warning,
           onTap: enabled
               ? () => sensorRepo.togglePump(
                     'bomba_dosificadora_acido',
@@ -528,7 +531,7 @@ class DashboardScreen extends ConsumerWidget {
           label: 'Base',
           icon: Icons.local_drink,
           isActive: sensor.bombaDosificadoraBasico ?? false,
-          color: AppColors.success,
+          color: c.success,
           onTap: enabled
               ? () => sensorRepo.togglePump(
                     'bomba_dosificadora_basico',
@@ -542,27 +545,27 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Color _tempColor(double temp) {
-    if (temp < 15 || temp > 30) return AppColors.error;
-    return AppColors.success;
+  Color _tempColor(double temp, AppColorScheme c) {
+    if (temp < 15 || temp > 30) return c.error;
+    return c.success;
   }
 
-  Color _phColor(double ph, PlantProfile? profile) {
-    if (profile == null) return AppColors.success;
-    if (ph < profile.phMin || ph > profile.phMax) return AppColors.error;
-    return AppColors.success;
+  Color _phColor(double ph, PlantProfile? profile, AppColorScheme c) {
+    if (profile == null) return c.success;
+    if (ph < profile.phMin || ph > profile.phMax) return c.error;
+    return c.success;
   }
 
-  Color _ecColor(double ec, PlantProfile? profile) {
-    if (profile == null) return AppColors.success;
-    if (ec < profile.ecMin || ec > profile.ecMax) return AppColors.error;
-    return AppColors.success;
+  Color _ecColor(double ec, PlantProfile? profile, AppColorScheme c) {
+    if (profile == null) return c.success;
+    if (ec < profile.ecMin || ec > profile.ecMax) return c.error;
+    return c.success;
   }
 
-  Color _levelColor(double level) {
-    if (level < 20) return AppColors.error;
-    if (level < 50) return AppColors.warning;
-    return AppColors.success;
+  Color _levelColor(double level, AppColorScheme c) {
+    if (level < 20) return c.error;
+    if (level < 50) return c.warning;
+    return c.success;
   }
 
   String _levelLabel(double level) {

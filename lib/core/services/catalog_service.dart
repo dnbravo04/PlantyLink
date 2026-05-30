@@ -53,6 +53,40 @@ class CatalogService {
     });
   }
 
+  // ── Care guide cache ──────────────────────────────────────────────────────
+
+  /// Returns cached care guide sections for [perenualId], or `null` on miss/expiry.
+  Future<List<Map<String, dynamic>>?> getCachedCareGuide(int perenualId) async {
+    final snap = await _db.ref('cached/care_guides/$perenualId').get();
+    if (!snap.exists) return null;
+    final entry = snap.value as Map<dynamic, dynamic>?;
+    if (entry == null) return null;
+
+    final cachedAtMs = entry['cached_at'] as int?;
+    if (cachedAtMs == null) return null;
+
+    final age = DateTime.now().millisecondsSinceEpoch - cachedAtMs;
+    if (age > const Duration(days: _cacheTTLDays).inMilliseconds) return null;
+
+    final sections = entry['sections'];
+    if (sections is! List) return null;
+    return sections
+        .whereType<Map>()
+        .map((m) => Map<String, dynamic>.from(m))
+        .toList();
+  }
+
+  /// Stores care guide [sections] under `cached/care_guides/{perenualId}/`.
+  Future<void> cacheCareGuide(
+    int perenualId,
+    List<Map<String, dynamic>> sections,
+  ) async {
+    await _db.ref('cached/care_guides/$perenualId').set({
+      'cached_at': DateTime.now().millisecondsSinceEpoch,
+      'sections': sections,
+    });
+  }
+
   // ── User catalog ───────────────────────────────────────────────────────────
 
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;

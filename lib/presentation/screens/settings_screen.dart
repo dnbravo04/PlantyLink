@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_color_scheme.dart';
 import '../../models/plant_profile.dart';
 import '../../models/sensor_data.dart';
 import '../providers/app_providers.dart';
@@ -119,34 +120,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Cerrar sesión',
-          style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
-        ),
-        content: const Text(
-          '¿Estás seguro de que quieres cerrar sesión?',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
+      builder: (ctx) {
+        final dc = AppColors.of(ctx);
+        return AlertDialog(
+          backgroundColor: dc.cardBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Cerrar sesión',
+            style: TextStyle(color: dc.textPrimary, fontSize: 18),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Cerrar sesión',
-              style: TextStyle(color: AppColors.error),
-            ),
+          content: Text(
+            '¿Estás seguro de que quieres cerrar sesión?',
+            style: TextStyle(color: dc.textSecondary),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: dc.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                'Cerrar sesión',
+                style: TextStyle(color: dc.error),
+              ),
+            ),
+          ],
+        );
+      },
     );
 
     if (confirmed == true) {
@@ -163,14 +167,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final userAsync = ref.watch(userProfileProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
     final alertsAsync = ref.watch(alertsEnabledProvider);
     final sensorAsync = ref.watch(sensorProvider);
 
     // Initialize threshold sliders once, the first time the profile loads.
-    // Using ref.listen avoids mutating state during build — the callback fires
-    // only when activePlantProfileProvider emits a new value.
     ref.listen<AsyncValue<PlantProfile?>>(activePlantProfileProvider,
         (_, next) {
       next.whenData((profile) {
@@ -193,8 +196,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         (_, next) {
       next.whenData((user) {
         if (!_profileSettingsInitialized) {
-          final viz =
-              user['modo_visualizacion'] as String? ?? 'tecnica';
+          final viz = user['modo_visualizacion'] as String? ?? 'tecnica';
           final sensors = user['sensores_activos'] as List<dynamic>?;
           setState(() {
             _profileSettingsInitialized = true;
@@ -203,7 +205,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _activeSensors = sensors.cast<String>();
             }
           });
-          // Pre-fill text controllers from Firebase (only while not editing).
           if (!_isEditingName) {
             _nameController.text = user['nombre']?.toString() ?? '';
           }
@@ -225,49 +226,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
-            _buildSectionTitle('Perfil de usuario'),
+            _buildSectionTitle('Perfil de usuario', c),
             const SizedBox(height: 8),
-            _buildProfileCard(userAsync),
+            _buildProfileCard(userAsync, c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Cultivo activo'),
+            _buildSectionTitle('Cultivo activo', c),
             const SizedBox(height: 8),
-            _buildActivePlantCard(profileAsync),
+            _buildActivePlantCard(profileAsync, c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Umbrales personalizados'),
+            _buildSectionTitle('Umbrales personalizados', c),
             const SizedBox(height: 8),
-            _buildThresholdsCard(profileAsync),
+            _buildThresholdsCard(profileAsync, c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Sensores activos'),
+            _buildSectionTitle('Sensores activos', c),
             const SizedBox(height: 8),
-            _buildActiveSensorsCard(),
+            _buildActiveSensorsCard(c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Modo de visualización'),
+            _buildSectionTitle('Modo de visualización', c),
             const SizedBox(height: 8),
-            _buildVisualizationModeCard(),
+            _buildVisualizationModeCard(c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Apariencia'),
+            _buildSectionTitle('Apariencia', c),
             const SizedBox(height: 8),
-            _buildThemeCard(),
+            _buildThemeCard(c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Notificaciones'),
+            _buildSectionTitle('Notificaciones', c),
             const SizedBox(height: 8),
-            _buildAlertsCard(alertsAsync),
+            _buildAlertsCard(alertsAsync, c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Sistema'),
+            _buildSectionTitle('Sistema', c),
             const SizedBox(height: 8),
-            _buildSystemCard(sensorAsync),
+            _buildSystemCard(sensorAsync, c),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('Cuenta'),
+            _buildSectionTitle('Cuenta', c),
             const SizedBox(height: 8),
-            _buildSignOutButton(),
+            _buildSignOutButton(c),
             const SizedBox(height: 24),
           ],
         ),
@@ -275,18 +276,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, AppColorScheme c) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: c.textPrimary,
       ),
     );
   }
 
-  Widget _buildProfileCard(AsyncValue<Map<String, dynamic>> userAsync) {
+  Widget _buildProfileCard(
+    AsyncValue<Map<String, dynamic>> userAsync,
+    AppColorScheme c,
+  ) {
     return userAsync.when(
       data: (user) {
         final name = _nameController.text.isNotEmpty
@@ -298,17 +302,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppColors.cardBackground,
-                AppColors.cardBackground.withValues(alpha: 0.8),
+                c.cardBackground,
+                c.cardBackground.withValues(alpha: 0.8),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            border: Border.all(color: c.cardBorder, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardBorder.withValues(alpha: 0.2),
+                color: c.cardBorder.withValues(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -320,15 +324,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.info, AppColors.accent],
+                  gradient: LinearGradient(
+                    colors: [c.info, c.accent],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.info.withValues(alpha: 0.4),
+                      color: c.info.withValues(alpha: 0.4),
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),
@@ -355,6 +359,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   setState(() => _isEditingName = false);
                   _saveUserProfile();
                 },
+                c: c,
               ),
               const SizedBox(height: 12),
               _buildEditableRow(
@@ -366,16 +371,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   setState(() => _isEditingCity = false);
                   _saveUserProfile();
                 },
+                c: c,
               ),
             ],
           ),
         );
       },
-      loading: () =>
-          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      error: (_, _) => const Text(
+      loading: () => Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+      ),
+      error: (_, _) => Text(
         'Error al cargar perfil',
-        style: TextStyle(color: AppColors.textSecondary),
+        style: TextStyle(color: c.textSecondary),
       ),
     );
   }
@@ -386,6 +393,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required bool isEditing,
     required VoidCallback onEdit,
     required VoidCallback onSave,
+    required AppColorScheme c,
   }) {
     return Row(
       children: [
@@ -393,22 +401,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: isEditing
               ? TextField(
                   controller: controller,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: c.textPrimary, fontSize: 14),
                   decoration: InputDecoration(
                     labelText: label,
-                    labelStyle: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
+                    labelStyle: TextStyle(color: c.textSecondary, fontSize: 12),
                     filled: true,
-                    fillColor: AppColors.background,
+                    fillColor: c.background,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide:
-                          const BorderSide(color: AppColors.cardBorder),
+                      borderSide: BorderSide(color: c.cardBorder),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -422,18 +423,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
+                      style: TextStyle(fontSize: 11, color: c.textSecondary),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       controller.text.isEmpty ? '—' : controller.text,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
+                      style: TextStyle(fontSize: 14, color: c.textPrimary),
                     ),
                   ],
                 ),
@@ -441,8 +436,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         IconButton(
           icon: Icon(
             isEditing ? Icons.check : Icons.edit,
-            color:
-                isEditing ? AppColors.success : AppColors.textSecondary,
+            color: isEditing ? c.success : c.textSecondary,
             size: 18,
           ),
           onPressed: isEditing ? onSave : onEdit,
@@ -451,7 +445,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildActivePlantCard(AsyncValue<PlantProfile?> profileAsync) {
+  Widget _buildActivePlantCard(
+    AsyncValue<PlantProfile?> profileAsync,
+    AppColorScheme c,
+  ) {
     return profileAsync.when(
       data: (profile) {
         return Container(
@@ -459,17 +456,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppColors.cardBackground,
-                AppColors.cardBackground.withValues(alpha: 0.7),
+                c.cardBackground,
+                c.cardBackground.withValues(alpha: 0.7),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            border: Border.all(color: c.cardBorder, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardBorder.withValues(alpha: 0.15),
+                color: c.cardBorder.withValues(alpha: 0.15),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -483,15 +480,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.success.withValues(alpha: 0.2),
-                      AppColors.success.withValues(alpha: 0.05),
+                      c.success.withValues(alpha: 0.2),
+                      c.success.withValues(alpha: 0.05),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppColors.success.withValues(alpha: 0.3),
+                    color: c.success.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
                 ),
@@ -509,10 +506,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text(
                       profile?.nombre ?? 'Sin configurar',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -521,17 +518,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Container(
                           width: 6,
                           height: 6,
-                          decoration: const BoxDecoration(
-                            color: AppColors.success,
+                          decoration: BoxDecoration(
+                            color: c.success,
                             shape: BoxShape.circle,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
+                        Text(
                           'Planta activa',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                           ),
                         ),
                       ],
@@ -539,7 +536,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
               ),
-              // Fix S-03: "Cambiar" is now a proper tappable button.
               GestureDetector(
                 onTap: () => ref.read(selectedTabIndexProvider.notifier).select(1),
                 child: Container(
@@ -550,20 +546,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.info.withValues(alpha: 0.15),
-                        AppColors.info.withValues(alpha: 0.05),
+                        c.info.withValues(alpha: 0.15),
+                        c.info.withValues(alpha: 0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.info.withValues(alpha: 0.3),
+                      color: c.info.withValues(alpha: 0.3),
                       width: 1.5,
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Cambiar',
                     style: TextStyle(
-                      color: AppColors.info,
+                      color: c.info,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -574,34 +570,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () =>
-          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      error: (_, _) => const Text(
+      loading: () => Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+      ),
+      error: (_, _) => Text(
         'Error al cargar cultivo',
-        style: TextStyle(color: AppColors.textSecondary),
+        style: TextStyle(color: c.textSecondary),
       ),
     );
   }
 
-  Widget _buildThresholdsCard(AsyncValue<PlantProfile?> profileAsync) {
-    // Show placeholder until the profile has loaded and initialized the sliders.
+  Widget _buildThresholdsCard(
+    AsyncValue<PlantProfile?> profileAsync,
+    AppColorScheme c,
+  ) {
     if (!_thresholdInitialized) {
       return profileAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        error: (_, _) => const Text(
+        loading: () => Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+        ),
+        error: (_, _) => Text(
           'Error al cargar umbrales',
-          style: TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(color: c.textSecondary),
         ),
         data: (profile) {
           if (profile == null) {
-            return const Text(
+            return Text(
               'No hay cultivo activo para mostrar umbrales.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: TextStyle(color: c.textSecondary, fontSize: 13),
             );
           }
-          // First data arrived but ref.listen hasn't fired yet — show spinner.
-          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+          return Center(
+            child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+          );
         },
       );
     }
@@ -611,17 +612,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.cardBackground,
-            AppColors.cardBackground.withValues(alpha: 0.7),
+            c.cardBackground,
+            c.cardBackground.withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.5),
+        border: Border.all(color: c.cardBorder, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.cardBorder.withValues(alpha: 0.15),
+            color: c.cardBorder.withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -632,45 +633,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildThresholdSlider(
             label: 'Temperatura (°C)',
             icon: Icons.thermostat,
-            color: AppColors.warning,
+            color: c.warning,
             min: _tempMin,
             max: _tempMax,
             absMin: 0,
             absMax: 50,
-            onChanged: (min, max) =>
-                setState(() {
-                  _tempMin = min;
-                  _tempMax = max;
-                }),
+            onChanged: (min, max) => setState(() {
+              _tempMin = min;
+              _tempMax = max;
+            }),
+            c: c,
           ),
           _buildThresholdSlider(
             label: 'pH',
             icon: Icons.science,
-            color: AppColors.info,
+            color: c.info,
             min: _phMin,
             max: _phMax,
             absMin: 0,
             absMax: 14,
-            onChanged: (min, max) =>
-                setState(() {
-                  _phMin = min;
-                  _phMax = max;
-                }),
+            onChanged: (min, max) => setState(() {
+              _phMin = min;
+              _phMax = max;
+            }),
+            c: c,
           ),
           _buildThresholdSlider(
             label: 'EC (mS/cm)',
             icon: Icons.electric_bolt,
-            color: AppColors.accent,
+            color: c.accent,
             min: _ecMin,
             max: _ecMax,
             absMin: 0,
             absMax: 5,
             divisions: 50,
-            onChanged: (min, max) =>
-                setState(() {
-                  _ecMin = min;
-                  _ecMax = max;
-                }),
+            onChanged: (min, max) => setState(() {
+              _ecMin = min;
+              _ecMax = max;
+            }),
+            c: c,
           ),
           const SizedBox(height: 16),
           Row(
@@ -680,13 +681,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        AppColors.info.withValues(alpha: 0.2),
-                        AppColors.info.withValues(alpha: 0.1),
+                        c.info.withValues(alpha: 0.2),
+                        c.info.withValues(alpha: 0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppColors.info.withValues(alpha: 0.4),
+                      color: c.info.withValues(alpha: 0.4),
                       width: 1.5,
                     ),
                   ),
@@ -722,7 +723,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
-                      foregroundColor: AppColors.info,
+                      foregroundColor: c.info,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -739,20 +740,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    final catalog = ref.read(plantRepositoryProvider).availablePlants;
-                    final profile = ref.read(activePlantProfileProvider).value;
+                    final catalog =
+                        ref.read(plantRepositoryProvider).availablePlants;
+                    final profile =
+                        ref.read(activePlantProfileProvider).value;
                     if (profile == null) return;
                     final match = catalog.firstWhere(
                       (p) => p.nombre == profile.nombre,
                       orElse: () => profile,
                     );
                     ref.read(plantRepositoryProvider).selectPlant(match);
-                    // Reset initialization so sliders reload from the reset profile.
                     setState(() => _thresholdInitialized = false);
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    side: const BorderSide(color: AppColors.cardBorder),
+                    foregroundColor: c.textSecondary,
+                    side: BorderSide(color: c.cardBorder),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -777,6 +779,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required double absMax,
     int? divisions,
     required void Function(double min, double max) onChanged,
+    required AppColorScheme c,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
@@ -805,9 +808,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(width: 10),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -846,9 +849,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   max: absMax,
                   divisions: divisions ?? (absMax - absMin).toInt() * 2,
                   activeColor: color,
-                  inactiveColor: AppColors.cardBorder,
-                  onChanged: (values) =>
-                      onChanged(values.start, values.end),
+                  inactiveColor: c.cardBorder,
+                  onChanged: (values) => onChanged(values.start, values.end),
                 ),
               ),
               const SizedBox(width: 12),
@@ -881,18 +883,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeCard() {
+  Widget _buildThemeCard(AppColorScheme c) {
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.5),
+        border: Border.all(color: c.cardBorder, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.cardBorder.withValues(alpha: 0.15),
+            color: c.cardBorder.withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -903,13 +905,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.12),
+              color: c.info.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.info.withValues(alpha: 0.3), width: 1.5),
+              border: Border.all(
+                color: c.info.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
             ),
             child: Icon(
               isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-              color: AppColors.info,
+              color: c.info,
               size: 24,
             ),
           ),
@@ -918,18 +923,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Tema',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   isDark ? 'Modo oscuro' : 'Modo claro',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: c.textSecondary),
                 ),
               ],
             ),
@@ -937,31 +942,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Switch(
             value: isDark,
             onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-            activeThumbColor: AppColors.info,
+            activeThumbColor: c.info,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAlertsCard(AsyncValue<bool> alertsAsync) {
+  Widget _buildAlertsCard(AsyncValue<bool> alertsAsync, AppColorScheme c) {
     final enabled = alertsAsync.value ?? true;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.cardBackground,
-            AppColors.cardBackground.withValues(alpha: 0.7),
+            c.cardBackground,
+            c.cardBackground.withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.5),
+        border: Border.all(color: c.cardBorder, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.cardBorder.withValues(alpha: 0.15),
+            color: c.cardBorder.withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -974,13 +979,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.warning.withValues(alpha: 0.2),
-                  AppColors.warning.withValues(alpha: 0.05),
+                  c.warning.withValues(alpha: 0.2),
+                  c.warning.withValues(alpha: 0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.warning.withValues(alpha: 0.3),
+                color: c.warning.withValues(alpha: 0.3),
                 width: 1.5,
               ),
             ),
@@ -988,12 +993,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               enabled
                   ? Icons.notifications_active
                   : Icons.notifications_off,
-              color: AppColors.warning,
+              color: c.warning,
               size: 24,
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1002,16 +1007,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: c.textPrimary,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   'Alertas de sensores',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: c.textSecondary),
                 ),
               ],
             ),
@@ -1019,14 +1021,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Switch(
             value: enabled,
             onChanged: _toggleAlerts,
-            activeThumbColor: AppColors.warning,
+            activeThumbColor: c.warning,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSystemCard(AsyncValue<SensorData> sensorAsync) {
+  Widget _buildSystemCard(AsyncValue<SensorData> sensorAsync, AppColorScheme c) {
     return sensorAsync.when(
       data: (sensor) {
         final connected = sensor.conectado ?? false;
@@ -1035,17 +1037,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppColors.cardBackground,
-                AppColors.cardBackground.withValues(alpha: 0.7),
+                c.cardBackground,
+                c.cardBackground.withValues(alpha: 0.7),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.cardBorder, width: 1.5),
+            border: Border.all(color: c.cardBorder, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: AppColors.cardBorder.withValues(alpha: 0.15),
+                color: c.cardBorder.withValues(alpha: 0.15),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1059,13 +1061,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: connected ? AppColors.success : AppColors.error,
+                      color: connected ? c.success : c.error,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: (connected
-                                  ? AppColors.success
-                                  : AppColors.error)
+                          color: (connected ? c.success : c.error)
                               .withValues(alpha: 0.5),
                           blurRadius: 8,
                           spreadRadius: 2,
@@ -1076,10 +1076,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(width: 12),
                   Text(
                     connected ? 'ESP32 conectado' : 'ESP32 desconectado',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: c.textPrimary,
                     ),
                   ),
                 ],
@@ -1090,21 +1090,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.cardBorder.withValues(alpha: 0.3),
+                      color: c.cardBorder.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.info_outline,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                       size: 16,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     'Versión 1.0.0',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                     ),
                   ),
                 ],
@@ -1116,11 +1116,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onPressed: () =>
                       Navigator.pushNamed(context, '/onboarding/esp32'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.info,
-                    side: const BorderSide(
-                      color: AppColors.cardBorder,
-                      width: 1.5,
-                    ),
+                    foregroundColor: c.info,
+                    side: BorderSide(color: c.cardBorder, width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -1143,16 +1140,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       },
-      loading: () =>
-          const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-      error: (_, _) => const Text(
+      loading: () => Center(
+        child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+      ),
+      error: (_, _) => Text(
         'Error al cargar estado',
-        style: TextStyle(color: AppColors.textSecondary),
+        style: TextStyle(color: c.textSecondary),
       ),
     );
   }
 
-  Widget _buildActiveSensorsCard() {
+  Widget _buildActiveSensorsCard(AppColorScheme c) {
     final sensors = [
       {
         'key': 'temperatura',
@@ -1180,16 +1178,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: c.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Selecciona los sensores que quieres ver en el dashboard',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: c.textSecondary),
           ),
           const SizedBox(height: 12),
           ...sensors.map(
@@ -1199,24 +1197,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Icon(
                     sensor['icon'] as IconData,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                     size: 20,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       sensor['label'] as String,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
+                      style: TextStyle(fontSize: 14, color: c.textPrimary),
                     ),
                   ),
                   Switch(
                     value: _activeSensors.contains(sensor['key']),
                     onChanged: (_) =>
                         _toggleSensor(sensor['key'] as String),
-                    activeThumbColor: AppColors.success,
+                    activeThumbColor: c.success,
                   ),
                 ],
               ),
@@ -1227,20 +1222,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildVisualizationModeCard() {
+  Widget _buildVisualizationModeCard(AppColorScheme c) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.cardBorder),
+        border: Border.all(color: c.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Selecciona cómo quieres ver las métricas',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: c.textSecondary),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1252,13 +1247,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _visualizationMode == 'tecnica'
-                          ? AppColors.info.withValues(alpha: 0.15)
-                          : AppColors.cardBackground,
+                          ? c.info.withValues(alpha: 0.15)
+                          : c.cardBackground,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: _visualizationMode == 'tecnica'
-                            ? AppColors.info
-                            : AppColors.cardBorder,
+                            ? c.info
+                            : c.cardBorder,
                       ),
                     ),
                     child: Row(
@@ -1266,8 +1261,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icon(
                           Icons.speed_outlined,
                           color: _visualizationMode == 'tecnica'
-                              ? AppColors.info
-                              : AppColors.textSecondary,
+                              ? c.info
+                              : c.textSecondary,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -1277,8 +1272,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               color: _visualizationMode == 'tecnica'
-                                  ? AppColors.info
-                                  : AppColors.textPrimary,
+                                  ? c.info
+                                  : c.textPrimary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1296,13 +1291,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: _visualizationMode == 'sencilla'
-                          ? AppColors.success.withValues(alpha: 0.15)
-                          : AppColors.cardBackground,
+                          ? c.success.withValues(alpha: 0.15)
+                          : c.cardBackground,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: _visualizationMode == 'sencilla'
-                            ? AppColors.success
-                            : AppColors.cardBorder,
+                            ? c.success
+                            : c.cardBorder,
                       ),
                     ),
                     child: Row(
@@ -1310,8 +1305,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Icon(
                           Icons.visibility_outlined,
                           color: _visualizationMode == 'sencilla'
-                              ? AppColors.success
-                              : AppColors.textSecondary,
+                              ? c.success
+                              : c.textSecondary,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -1321,8 +1316,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               color: _visualizationMode == 'sencilla'
-                                  ? AppColors.success
-                                  : AppColors.textPrimary,
+                                  ? c.success
+                                  : c.textPrimary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1339,25 +1334,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSignOutButton() {
+  Widget _buildSignOutButton(AppColorScheme c) {
     return SizedBox(
       width: double.infinity,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.error.withValues(alpha: 0.15),
-              AppColors.error.withValues(alpha: 0.05),
+              c.error.withValues(alpha: 0.15),
+              c.error.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: AppColors.error.withValues(alpha: 0.4),
+            color: c.error.withValues(alpha: 0.4),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.error.withValues(alpha: 0.2),
+              color: c.error.withValues(alpha: 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -1367,7 +1362,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onPressed: _signOut,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
-            foregroundColor: AppColors.error,
+            foregroundColor: c.error,
             shadowColor: Colors.transparent,
             elevation: 0,
             shape: RoundedRectangleBorder(

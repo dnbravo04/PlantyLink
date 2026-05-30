@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_nfc_kit/flutter_nfc_kit.dart';
+import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
@@ -53,17 +54,24 @@ class _Esp32VinculacionScreenState
     for (final c in _rippleControllers) {
       c.dispose();
     }
+    NfcManager.instance.stopSession();
     super.dispose();
   }
 
   Future<void> _checkNfcAvailability() async {
     try {
-      final availability = await FlutterNfcKit.nfcAvailability;
+      final avail = await NfcManager.instance.checkAvailability();
       if (mounted) {
-        setState(() {
-          _isNfcAvailable = availability == NFCAvailability.available;
-        });
+        setState(() => _isNfcAvailable = avail == NfcAvailability.enabled);
         if (_isNfcAvailable) _startNfcScan();
+        if (!_isNfcAvailable) {
+          setState(() {
+            _exitoso = false;
+            _errorMessage = avail == NfcAvailability.unsupported
+                ? 'Este dispositivo no soporta NFC.'
+                : 'Activa NFC en los ajustes del dispositivo.';
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -85,11 +93,16 @@ class _Esp32VinculacionScreenState
       _errorMessage = null;
     });
     _startRipples();
+
     try {
-      final tag = await FlutterNfcKit.poll(
-        timeout: const Duration(seconds: 30),
+      await NfcManager.instance.startSession(
+        pollingOptions: {NfcPollingOption.iso14443, NfcPollingOption.iso15693},
+        onDiscovered: (NfcTag tag) async {
+          final deviceId = _extractTagId(tag);
+          await _processNfcTag(deviceId);
+          await NfcManager.instance.stopSession();
+        },
       );
-      await _processNfcTag(tag);
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -102,9 +115,19 @@ class _Esp32VinculacionScreenState
     }
   }
 
-  Future<void> _processNfcTag(NFCTag tag) async {
+  /// Extracts a hex string identifier from the NFC tag.
+  String _extractTagId(NfcTag tag) {
+    final androidTag = NfcTagAndroid.from(tag);
+    if (androidTag != null) {
+      return androidTag.id
+          .map((e) => e.toRadixString(16).padLeft(2, '0'))
+          .join(':');
+    }
+    return 'esp32-${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  Future<void> _processNfcTag(String deviceId) async {
     try {
-      final deviceId = tag.id;
       await ref.read(deviceServiceProvider).vincularESP32(deviceId);
       if (mounted) {
         setState(() {
@@ -154,7 +177,9 @@ class _Esp32VinculacionScreenState
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: c.background,
       body: Stack(
         children: [
@@ -168,6 +193,7 @@ class _Esp32VinculacionScreenState
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -196,7 +222,7 @@ class _Esp32VinculacionScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.pushReplacementNamed(context, '/onboarding/welcome'),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -262,7 +288,6 @@ class _Esp32VinculacionScreenState
 
             const SizedBox(height: 24),
 
-            // Skip link
             if (_exitoso == null || _exitoso == false) ...[
               TextButton(
                 onPressed: () =>
@@ -288,7 +313,6 @@ class _Esp32VinculacionScreenState
     return _buildScanning(c);
   }
 
-  // ── Scanning: ripple sonar ──────────────────────────────────────────────────
   Widget _buildScanning(AppColorScheme c) {
     final ringColor = c.isDark ? const Color(0xFF22D3EE) : const Color(0xFF0891B2);
     return Column(
@@ -299,7 +323,6 @@ class _Esp32VinculacionScreenState
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Ripple rings
               for (int i = 0; i < 3; i++)
                 AnimatedBuilder(
                   animation: _rippleAnimations[i],
@@ -312,23 +335,20 @@ class _Esp32VinculacionScreenState
                         height: 80 + val * 120,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: ringColor,
-                            width: 1.5,
-                          ),
+                          border: Border.all(color: ringColor, width: 1.5),
                         ),
                       ),
                     );
                   },
                 ),
-
-              // Center icon
               Container(
                 width: 80, height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: ringColor.withValues(alpha: 0.12),
-                  border: Border.all(color: ringColor.withValues(alpha: 0.5), width: 2),
+                  border: Border.all(
+                    color: ringColor.withValues(alpha: 0.5), width: 2,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: ringColor.withValues(alpha: 0.3),
@@ -358,7 +378,6 @@ class _Esp32VinculacionScreenState
     );
   }
 
-  // ── Success ────────────────────────────────────────────────────────────────
   Widget _buildSuccess(AppColorScheme c) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -370,10 +389,7 @@ class _Esp32VinculacionScreenState
             color: c.success.withValues(alpha: 0.12),
             border: Border.all(color: c.success.withValues(alpha: 0.4), width: 2),
             boxShadow: [
-              BoxShadow(
-                color: c.success.withValues(alpha: 0.3),
-                blurRadius: 24,
-              ),
+              BoxShadow(color: c.success.withValues(alpha: 0.3), blurRadius: 24),
             ],
           ),
           child: Icon(Icons.check_rounded, size: 52, color: c.success),
@@ -396,8 +412,7 @@ class _Esp32VinculacionScreenState
             child: Text(
               'ID: $_esp32Id',
               style: TextStyle(
-                fontSize: 12, color: c.textMuted,
-                fontFamily: 'monospace',
+                fontSize: 12, color: c.textMuted, fontFamily: 'monospace',
               ),
             ),
           ),
@@ -411,7 +426,6 @@ class _Esp32VinculacionScreenState
     );
   }
 
-  // ── Error ──────────────────────────────────────────────────────────────────
   Widget _buildError(AppColorScheme c) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,

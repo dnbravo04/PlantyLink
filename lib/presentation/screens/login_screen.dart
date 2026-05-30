@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import '../../core/phone_utils.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
@@ -96,8 +95,6 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ── Google ─────────────────────────────────────────────────────────────────
-  // NOTE: Requires google-services.json (Android) / GoogleService-Info.plist
-  // (iOS) with a SHA-1 fingerprint registered in Firebase Console.
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
     try {
@@ -109,47 +106,26 @@ class _LoginScreenState extends State<LoginScreen>
         idToken:     googleAuth.idToken,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
+      // Widget may be disposed by AuthGate rebuilding on auth success — stop here.
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = _mapAuthError(e.code));
+      if (mounted) setState(() => _error = _mapAuthError(e.code));
     } catch (_) {
-      setState(() => _error = 'Error al iniciar con Google');
+      if (mounted) setState(() => _error = 'Error al iniciar con Google');
     } finally {
       _setLoading(false);
     }
   }
 
-  // ── Facebook ───────────────────────────────────────────────────────────────
-  // NOTE: Requires native Facebook SDK setup:
-  //   Android: AndroidManifest.xml meta-data + strings.xml facebook_app_id
-  //   iOS: Info.plist CFBundleURLSchemes + FacebookAppID
-  Future<void> _signInWithFacebook() async {
-    _setLoading(true);
-    try {
-      final result = await FacebookAuth.instance.login();
-      if (result.status != LoginStatus.success) { _setLoading(false); return; }
-      final credential = FacebookAuthProvider.credential(
-        result.accessToken!.tokenString,
-      );
-      await FirebaseAuth.instance.signInWithCredential(credential);
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = _mapAuthError(e.code));
-    } catch (_) {
-      setState(() => _error = 'Error al iniciar con Facebook');
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  void _setLoading(bool v) => setState(() => _cargando = v);
+  void _setLoading(bool v) { if (mounted) setState(() => _cargando = v); }
 
   String _mapAuthError(String code) => switch (code) {
-    'invalid-email'      => 'Correo inválido',
-    'user-not-found'     => 'No existe una cuenta con este correo',
-    'wrong-password'     => 'Contraseña incorrecta',
-    'invalid-credential' => 'Credenciales incorrectas',
-    'too-many-requests'  => 'Demasiados intentos. Intenta más tarde',
+    'invalid-email'        => 'Correo inválido',
+    'user-not-found'       => 'No existe una cuenta con este correo',
+    'wrong-password'       => 'Contraseña incorrecta',
+    'invalid-credential'   => 'Credenciales incorrectas',
+    'too-many-requests'    => 'Demasiados intentos. Intenta más tarde',
     'invalid-phone-number' => 'Número de teléfono inválido',
-    _                    => 'Algo salió mal. Intenta de nuevo',
+    _                      => 'Algo salió mal. Intenta de nuevo',
   };
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -307,7 +283,9 @@ class _LoginScreenState extends State<LoginScreen>
               style: TextStyle(color: c.textPrimary, fontSize: 15),
               decoration: InputDecoration(
                 labelText: _usingPhone ? 'Número de teléfono' : 'Correo electrónico',
-                prefixIcon: Icon(_usingPhone ? Icons.phone_outlined : Icons.mail_outline_rounded),
+                prefixIcon: Icon(
+                  _usingPhone ? Icons.phone_outlined : Icons.mail_outline_rounded,
+                ),
               ),
             ),
 
@@ -397,30 +375,15 @@ class _LoginScreenState extends State<LoginScreen>
 
             const SizedBox(height: 16),
 
-            // Social buttons
-            Row(children: [
-              Expanded(
-                child: _SocialButton(
-                  onPressed: _cargando ? null : _signInWithGoogle,
-                  label: 'Google',
-                  logo: _GoogleLogo(),
-                  borderColor: c.cardBorder,
-                  backgroundColor: c.cardBackground,
-                  textColor: c.textPrimary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _SocialButton(
-                  onPressed: _cargando ? null : _signInWithFacebook,
-                  label: 'Facebook',
-                  logo: _FacebookLogo(),
-                  borderColor: c.cardBorder,
-                  backgroundColor: c.cardBackground,
-                  textColor: c.textPrimary,
-                ),
-              ),
-            ]),
+            // Google sign-in button (full width)
+            _SocialButton(
+              onPressed: _cargando ? null : _signInWithGoogle,
+              label: 'Continuar con Google',
+              logo: _GoogleLogo(),
+              borderColor: c.cardBorder,
+              backgroundColor: c.cardBackground,
+              textColor: c.textPrimary,
+            ),
 
             const SizedBox(height: 20),
 
@@ -496,6 +459,7 @@ class _SocialButton extends StatelessWidget {
       onTap: onPressed,
       borderRadius: BorderRadius.circular(14),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
           color: backgroundColor,
@@ -506,7 +470,7 @@ class _SocialButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             logo,
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(
@@ -535,7 +499,7 @@ class _GoogleLogo extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 2,
-          )
+          ),
         ],
       ),
       child: const Center(
@@ -545,30 +509,6 @@ class _GoogleLogo extends StatelessWidget {
             fontSize: 12,
             fontWeight: FontWeight.w800,
             color: Color(0xFF4285F4),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FacebookLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 20, height: 20,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Color(0xFF1877F2),
-      ),
-      child: const Center(
-        child: Text(
-          'f',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            height: 1.1,
           ),
         ),
       ),

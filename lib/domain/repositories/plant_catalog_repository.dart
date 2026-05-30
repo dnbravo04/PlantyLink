@@ -9,9 +9,15 @@ import '../../models/plant_profile.dart';
 /// - Caching API responses in Firebase to reduce redundant network calls.
 /// - Mapping raw Firebase catalog entries back to [PlantProfile] objects.
 abstract class PlantCatalogRepository {
-  /// Search Perenual for species matching [query].
-  /// Returns an empty list on network failure (non-throwing).
-  Future<List<PerenualSpecies>> searchSpecies(String query, {int page = 1});
+  /// Search Perenual for species matching [query] on [page].
+  ///
+  /// Returns a record with:
+  /// - [results]: the species on this page.
+  /// - [totalPages]: total number of pages for this query.
+  Future<({List<PerenualSpecies> results, int totalPages})> searchSpecies(
+    String query, {
+    int page = 1,
+  });
 
   /// Fetch a [PlantProfile] enriched with Perenual detail for [perenualId].
   /// Falls back to a non-enriched profile when [perenualId] is null or the

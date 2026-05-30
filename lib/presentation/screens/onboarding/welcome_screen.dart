@@ -86,7 +86,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final c    = AppColors.of(context);
     final page = _pages[_currentPage];
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
         decoration: BoxDecoration(
@@ -188,6 +190,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             ],
           ),
         ),
+      ),
       ),
     );
   }

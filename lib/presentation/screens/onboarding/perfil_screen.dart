@@ -63,17 +63,6 @@ class _PerfilScreenState extends State<PerfilScreen>
       return;
     }
 
-    final snapshot = await db
-        .ref('usuarios')
-        .orderByChild('nombre')
-        .equalTo(nombre)
-        .get();
-
-    if (snapshot.exists) {
-      setState(() { _error = 'Este nombre ya está en uso, elige otro'; _cargando = false; });
-      return;
-    }
-
     await db.ref('usuarios/${user.uid}').set({
       'nombre': nombre,
       'ciudad': ciudad,
@@ -88,7 +77,9 @@ class _PerfilScreenState extends State<PerfilScreen>
     final c = AppColors.of(context);
     final nombre = _nombreCtrl.text;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
       backgroundColor: c.background,
       resizeToAvoidBottomInset: true,
       body: Stack(
@@ -119,21 +110,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withValues(alpha: 0.15),
-                              ),
-                              child: Icon(
-                                Icons.arrow_back_rounded,
-                                color: c.isDark ? c.textPrimary : Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
+                          const SizedBox(width: 36, height: 36),
                           const Spacer(),
                           Text(
                             'Cuéntanos sobre ti',
@@ -259,6 +236,7 @@ class _PerfilScreenState extends State<PerfilScreen>
             ),
           ),
         ],
+      ),
       ),
     );
   }

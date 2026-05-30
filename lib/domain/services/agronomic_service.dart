@@ -20,10 +20,14 @@ class AgronomicService {
   /// the full [base] profile so callers can always work with one type.
   EnrichedPlantProfile enrichPlant(
     PlantProfile base,
-    PerenualSpeciesDetail? detail,
-  ) {
+    PerenualSpeciesDetail? detail, {
+    List<PerenualCareSection> careSections = const [],
+  }) {
     if (detail == null) {
-      return EnrichedPlantProfile(base: base);
+      return EnrichedPlantProfile(
+        base: base,
+        careGuideSections: careSections,
+      );
     }
 
     final imageUrl = detail.defaultImage?.mediumUrl.isNotEmpty == true
@@ -44,6 +48,7 @@ class AgronomicService {
       growthRate: detail.growthRate.isNotEmpty ? detail.growthRate : null,
       careLevel: detail.careLevel.isNotEmpty ? detail.careLevel : null,
       careTips: _buildCareTips(detail),
+      careGuideSections: careSections,
     );
   }
 

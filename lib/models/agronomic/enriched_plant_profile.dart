@@ -1,3 +1,4 @@
+import '../../data/api/perenual_models.dart';
 import '../plant_profile.dart';
 import 'growth_stage.dart';
 
@@ -15,6 +16,7 @@ class EnrichedPlantProfile {
   final String? growthRate;
   final String? careLevel;
   final List<String> careTips;
+  final List<PerenualCareSection> careGuideSections;
   final GrowthStage currentStage;
 
   const EnrichedPlantProfile({
@@ -27,6 +29,7 @@ class EnrichedPlantProfile {
     this.growthRate,
     this.careLevel,
     this.careTips = const [],
+    this.careGuideSections = const [],
     this.currentStage = GrowthStage.vegetative,
   });
 
@@ -40,6 +43,7 @@ class EnrichedPlantProfile {
     String? growthRate,
     String? careLevel,
     List<String>? careTips,
+    List<PerenualCareSection>? careGuideSections,
     GrowthStage? currentStage,
   }) {
     return EnrichedPlantProfile(
@@ -52,6 +56,7 @@ class EnrichedPlantProfile {
       growthRate: growthRate ?? this.growthRate,
       careLevel: careLevel ?? this.careLevel,
       careTips: careTips ?? this.careTips,
+      careGuideSections: careGuideSections ?? this.careGuideSections,
       currentStage: currentStage ?? this.currentStage,
     );
   }

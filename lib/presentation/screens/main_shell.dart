@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_colors.dart';
 import '../providers/navigation_provider.dart';
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
@@ -24,7 +23,6 @@ class MainShell extends ConsumerWidget {
     final selectedIndex = ref.watch(selectedTabIndexProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: IndexedStack(
         index: selectedIndex,
         children: _screens,

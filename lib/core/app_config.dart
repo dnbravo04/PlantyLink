@@ -5,6 +5,7 @@
 ///   - `true`            → demo mode: all data comes from [DemoDataService]
 ///                         (in-memory simulation, zero Firebase reads/writes).
 ///
-/// Flip this flag to switch modes. In a CI/CD setup, wire this to a
-/// `--dart-define=DEMO_MODE=true` build argument instead of editing the file.
-const bool kDemoMode = false;
+/// Never flip this flag directly in code. Use a build argument instead:
+///   flutter run  --dart-define=DEMO_MODE=true
+///   flutter build appbundle --dart-define=DEMO_MODE=false
+const bool kDemoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);

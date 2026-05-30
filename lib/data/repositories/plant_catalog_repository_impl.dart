@@ -26,7 +26,7 @@ class PlantCatalogRepositoryImpl implements PlantCatalogRepository {
   // ── Search ─────────────────────────────────────────────────────────────────
 
   @override
-  Future<List<PerenualSpecies>> searchSpecies(
+  Future<({List<PerenualSpecies> results, int totalPages})> searchSpecies(
     String query, {
     int page = 1,
   }) async {
@@ -39,7 +39,7 @@ class PlantCatalogRepositoryImpl implements PlantCatalogRepository {
     }
     try {
       final response = await _api.searchSpecies(_apiKey, query, page: page);
-      return response.data;
+      return (results: response.data, totalPages: response.lastPage);
     } on DioException catch (e) {
       throw Exception('Error buscando plantas: ${e.message}');
     }
@@ -56,26 +56,62 @@ class PlantCatalogRepositoryImpl implements PlantCatalogRepository {
       return _agronomicService.enrichPlant(plant, null);
     }
 
-    // 1. Cache hit?
-    final cached = await _catalogService.getCachedSpecies(perenualId);
-    if (cached != null) {
+    // ── Check both caches in parallel ─────────────────────────────────────
+    final (cachedSpecies, cachedGuide) = await (
+      _catalogService.getCachedSpecies(perenualId),
+      _catalogService.getCachedCareGuide(perenualId),
+    ).wait;
+
+    // ── Species detail ─────────────────────────────────────────────────────
+    PerenualSpeciesDetail? detail;
+
+    if (cachedSpecies != null) {
       try {
-        final detail = PerenualSpeciesDetail.fromJson(cached);
-        return _agronomicService.enrichPlant(plant, detail);
-      } catch (_) {
-        // Malformed cache — fall through to API.
+        detail = PerenualSpeciesDetail.fromJson(cachedSpecies);
+      } catch (_) {}
+    }
+
+    // ── Care guide ─────────────────────────────────────────────────────────
+    List<PerenualCareSection> careSections = [];
+
+    if (cachedGuide != null) {
+      try {
+        careSections =
+            cachedGuide.map((m) => PerenualCareSection.fromJson(m)).toList();
+      } catch (_) {}
+    }
+
+    // ── Fetch from API for whatever is missing (parallel) ──────────────────
+    if ((detail == null || cachedGuide == null) && _apiKey.isNotEmpty) {
+      final futures = await (
+        detail == null
+            ? _api.getSpeciesDetail(perenualId, _apiKey).then<Object?>((d) => d).catchError((_) => null)
+            : Future<Object?>.value(null),
+        cachedGuide == null
+            ? _api.getCareGuides(perenualId, _apiKey).then<Object?>((r) => r).catchError((_) => null)
+            : Future<Object?>.value(null),
+      ).wait;
+
+      if (detail == null && futures.$1 is PerenualSpeciesDetail) {
+        detail = futures.$1 as PerenualSpeciesDetail;
+        await _catalogService.cacheSpecies(perenualId, detail.toJson());
+      }
+
+      if (cachedGuide == null && futures.$2 is PerenualCareGuideResponse) {
+        final guide = futures.$2 as PerenualCareGuideResponse;
+        if (guide.data.isNotEmpty) {
+          careSections = guide.data.first.section;
+          if (careSections.isNotEmpty) {
+            await _catalogService.cacheCareGuide(
+              perenualId,
+              careSections.map((s) => s.toJson()).toList(),
+            );
+          }
+        }
       }
     }
 
-    // 2. Fetch from Perenual, then cache.
-    try {
-      final detail = await _api.getSpeciesDetail(perenualId, _apiKey);
-      await _catalogService.cacheSpecies(perenualId, detail.toJson());
-      return _agronomicService.enrichPlant(plant, detail);
-    } on DioException catch (_) {
-      // Network failure: return un-enriched profile rather than throwing.
-      return _agronomicService.enrichPlant(plant, null);
-    }
+    return _agronomicService.enrichPlant(plant, detail, careSections: careSections);
   }
 
   // ── User catalog ───────────────────────────────────────────────────────────
