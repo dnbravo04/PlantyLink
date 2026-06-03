@@ -17,13 +17,17 @@ class ControlService {
     );
   }
 
-  /// Set [pumpKey] (e.g. `bomba_agua`) to [active] under `controls/`.
+  /// Set [pumpKey] (e.g. `bomba_agua`) to [active].
   ///
-  /// Retries up to 5 times with exponential backoff.
-  /// Throws on persistent failure — callers should handle and show UI feedback.
+  /// Writes to both `controls/` (ESP32 reads this) and `sensors/` (app UI
+  /// reads this), so the button state flips immediately without waiting for
+  /// the ESP32 to echo the value back.
   Future<void> setPump(String pumpKey, bool active) {
     return RetryPolicy.execute(
-      () => _db.ref('controls/$pumpKey').set(active),
+      () => _db.ref().update({
+        'controls/$pumpKey': active,
+        'sensors/$pumpKey': active,
+      }),
     );
   }
 
