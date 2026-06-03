@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
@@ -55,22 +54,11 @@ class _Esp32VinculacionScreenState
     for (final c in _rippleControllers) {
       c.dispose();
     }
-    if (!kIsWeb) NfcManager.instance.stopSession();
+    NfcManager.instance.stopSession();
     super.dispose();
   }
 
   Future<void> _checkNfcAvailability() async {
-    if (kIsWeb) {
-      if (mounted) {
-        setState(() {
-          _isNfcAvailable = false;
-          _exitoso = false;
-          _errorMessage = 'NFC no está disponible en la versión web.';
-        });
-        _stopRipples();
-      }
-      return;
-    }
     try {
       final avail = await NfcManager.instance.checkAvailability();
       if (mounted) {
