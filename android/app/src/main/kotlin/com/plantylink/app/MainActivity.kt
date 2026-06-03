@@ -1,4 +1,4 @@
-package com.example.hydrotracker
+package com.plantylink.app
 
 import io.flutter.embedding.android.FlutterActivity
 
