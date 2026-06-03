@@ -6,10 +6,12 @@ import '../../core/theme/app_color_scheme.dart';
 import '../../domain/repositories/sensor_repository.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
+import '../../models/trend_alert.dart';
 import '../providers/app_providers.dart';
 import '../providers/trend_alert_provider.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/dashboard/illuminated_button.dart';
+import 'scheduling_screen.dart';
 import '../widgets/dashboard/simple_metric.dart';
 import '../widgets/dashboard/sensor_card.dart';
 
@@ -54,8 +56,9 @@ class DashboardScreen extends ConsumerWidget {
               _buildAlert(sensorAsync, profileAsync, c),
               const SizedBox(height: 8),
               _buildTrendAlerts(ref, c),
+              _buildAlertHistory(ref, context, c),
               const SizedBox(height: 16),
-              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync, c),
+              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync, c, context),
               const Spacer(),
             ],
           ),
@@ -372,11 +375,37 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildAlertHistory(WidgetRef ref, BuildContext context, AppColorScheme c) {
+    final alerts = ref.watch(alertHistoryProvider).value ?? [];
+    if (alerts.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          leading: Icon(Icons.history_rounded, color: c.textMuted, size: 18),
+          title: Text(
+            'Historial de alertas (${alerts.length})',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: c.textMuted,
+            ),
+          ),
+          children: alerts.take(5).map((a) => _AlertHistoryTile(alert: a, c: c)).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPumpControls(
     AsyncValue<SensorData> sensorAsync,
     SensorRepository sensorRepo,
     AsyncValue<bool> connectivityAsync,
     AppColorScheme c,
+    BuildContext context,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,6 +440,39 @@ class DashboardScreen extends ConsumerWidget {
               ),
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SchedulingScreen()),
+              ),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: c.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: c.primary.withValues(alpha: 0.3), width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule_rounded, color: c.primary, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Programar',
+                      style: TextStyle(
+                        color: c.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -572,5 +634,49 @@ class DashboardScreen extends ConsumerWidget {
     if (level < 20) return 'Nivel crítico';
     if (level < 50) return 'Nivel bajo';
     return 'Nivel óptimo';
+  }
+}
+
+// ── Alert history row ──────────────────────────────────────────────────────────
+
+class _AlertHistoryTile extends StatelessWidget {
+  final TrendAlert alert;
+  final AppColorScheme c;
+
+  const _AlertHistoryTile({required this.alert, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: c.warning, size: 14),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              alert.message,
+              style: TextStyle(fontSize: 12, color: c.textSecondary),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _relativeTime(alert.timestamp),
+            style: TextStyle(fontSize: 11, color: c.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _relativeTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'ahora';
+    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'hace ${diff.inHours} h';
+    return 'hace ${diff.inDays} d';
   }
 }

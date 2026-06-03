@@ -18,6 +18,7 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -33,7 +34,7 @@ class StatusChip extends StatelessWidget {
         border: Border.all(
           color: isActive
               ? color.withValues(alpha: 0.3)
-              : AppColors.cardBorder,
+              : c.cardBorder,
           width: 1.5,
         ),
       ),
@@ -42,7 +43,7 @@ class StatusChip extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: isActive ? color : AppColors.textMuted,
+            color: isActive ? color : c.textMuted,
             size: 16,
           ),
           const SizedBox(width: 8),
@@ -51,7 +52,7 @@ class StatusChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: isActive ? color : AppColors.textSecondary,
+              color: isActive ? color : c.textSecondary,
             ),
           ),
         ],

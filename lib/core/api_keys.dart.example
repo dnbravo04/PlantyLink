@@ -1,0 +1,17 @@
+/// SETUP: Copy this file to api_keys.dart and fill in your key.
+///
+/// OPTION A — dart-define (recommended for CI/CD):
+///   flutter run   --dart-define=PERENUAL_API_KEY=your_key_here
+///   flutter build apk --dart-define=PERENUAL_API_KEY=your_key_here
+///
+/// OPTION B — local dev override (never commit):
+///   Paste your key into [_kDevOverride] below.
+///   api_keys.dart is already in .gitignore so it won't be committed.
+///
+/// Get a free key at: https://perenual.com/api/key-request
+const String _kDevOverride = ''; // ← paste your key here for local dev
+
+const String kPerenualApiKey = String.fromEnvironment(
+  'PERENUAL_API_KEY',
+  defaultValue: _kDevOverride,
+);

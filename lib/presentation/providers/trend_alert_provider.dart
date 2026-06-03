@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_config.dart';
+import '../../core/services/notification_service.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/trend_alert.dart';
@@ -59,9 +61,17 @@ class TrendNotifier extends Notifier<TrendAlertState> {
 
   Future<void> checkTrendAlerts(PlantProfile? profile) async {
     if (profile == null) return;
+
+    // Respect the user's alerts toggle — read the cached value (sync).
+    final alertsEnabled = ref.read(alertsEnabledProvider).value ?? true;
+    if (!alertsEnabled) {
+      // Clear any lingering active alerts when the user disables notifications.
+      if (state.alerts.isNotEmpty) state = const TrendAlertState();
+      return;
+    }
+
     // Do NOT set isLoading — keep the current alert list visible during the
     // check to avoid flicker on every 3-second sensor tick.
-
     try {
       final alerts = <TrendAlert>[];
 
@@ -97,9 +107,13 @@ class TrendNotifier extends Notifier<TrendAlertState> {
         if (alert != null && _shouldFireAlert(key)) {
           alerts.add(alert);
           _lastAlertTime[key] = DateTime.now();
-          // Persist via HistoryService — uses the repository abstraction,
-          // no direct Firebase access from this notifier.
-          ref.read(historyServiceProvider).saveAlert(alert);
+          // Persist to Firebase only in production (demo mode has no auth).
+          if (!kDemoMode) {
+            ref.read(historyServiceProvider).saveAlert(alert);
+          }
+          // Fire a local push notification so the user is alerted even when
+          // the app is in the background or on a different tab.
+          NotificationService.instance.showTrendAlert(key, alert.message);
         }
       }
 

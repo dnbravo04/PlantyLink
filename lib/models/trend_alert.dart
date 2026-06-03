@@ -29,6 +29,20 @@ class TrendAlert {
       'event': 'alerta_tendencia',
     };
   }
+
+  factory TrendAlert.fromMap(Map<dynamic, dynamic> map) {
+    return TrendAlert(
+      sensorKey: map['sensor_key'] as String? ?? '',
+      message: map['message'] as String? ?? '',
+      currentValue: (map['current_value'] as num?)?.toDouble() ?? 0,
+      predictedValue: (map['predicted_value'] as num?)?.toDouble() ?? 0,
+      slope: (map['slope'] as num?)?.toDouble() ?? 0,
+      timestamp: DateTime.fromMillisecondsSinceEpoch(
+        (map['timestamp'] as int?) ?? 0,
+      ),
+      thresholdType: map['threshold_type'] as String? ?? '',
+    );
+  }
 }
 
 class SensorReading {

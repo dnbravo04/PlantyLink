@@ -9,6 +9,8 @@ import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/common/app_scaffold.dart';
+import 'calibration_screen.dart';
+import 'scheduling_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -115,6 +117,132 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     });
     _saveActiveSensors();
+  }
+
+  Future<void> _changePassword() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Google/phone sign-in users can't change password this way.
+    final isEmailUser = user.providerData.any((p) => p.providerId == 'password');
+    if (!isEmailUser) {
+      if (!mounted) return;
+      final c = AppColors.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('El cambio de contraseña solo aplica para cuentas de correo electrónico.'),
+          backgroundColor: c.textMuted,
+        ),
+      );
+      return;
+    }
+
+    final currentCtrl = TextEditingController();
+    final newCtrl     = TextEditingController();
+    final confirmCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final dc = AppColors.of(ctx);
+        return AlertDialog(
+          backgroundColor: dc.cardBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Cambiar contraseña', style: TextStyle(color: dc.textPrimary)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentCtrl,
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Contraseña actual', labelStyle: TextStyle(color: dc.textMuted)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newCtrl,
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Nueva contraseña', labelStyle: TextStyle(color: dc.textMuted)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration: InputDecoration(labelText: 'Confirmar contraseña', labelStyle: TextStyle(color: dc.textMuted)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Guardar',  style: TextStyle(color: dc.primary))),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+    final c = AppColors.of(context);
+
+    if (newCtrl.text != confirmCtrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Las contraseñas no coinciden.'), backgroundColor: c.error));
+      return;
+    }
+    if (newCtrl.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('La contraseña debe tener al menos 6 caracteres.'), backgroundColor: c.error));
+      return;
+    }
+
+    try {
+      final cred = EmailAuthProvider.credential(email: user.email!, password: currentCtrl.text);
+      await user.reauthenticateWithCredential(cred);
+      await user.updatePassword(newCtrl.text);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Contraseña actualizada.'), backgroundColor: c.success));
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final msg = e.code == 'wrong-password' ? 'Contraseña actual incorrecta.' : 'Error: ${e.message}';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: c.error));
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final dc = AppColors.of(ctx);
+        return AlertDialog(
+          backgroundColor: dc.cardBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Eliminar cuenta', style: TextStyle(color: dc.error)),
+          content: Text(
+            'Esta acción es irreversible. Se eliminarán tu perfil y todos tus datos.\n\n¿Deseas continuar?',
+            style: TextStyle(color: dc.textSecondary),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
+            TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Eliminar', style: TextStyle(color: dc.error))),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final uid = user.uid;
+      await ref.read(profileServiceProvider).deleteUserData(uid);
+      await user.delete();
+      if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/onboarding/vinculacion', (route) => false);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final c = AppColors.of(context);
+      if (e.code == 'requires-recent-login') {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Por seguridad, cierra sesión y vuelve a iniciarla antes de eliminar la cuenta.'), backgroundColor: c.error));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${e.message}'), backgroundColor: c.error));
+      }
+    }
   }
 
   Future<void> _signOut() async {
@@ -268,7 +396,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             _buildSectionTitle('Cuenta', c),
             const SizedBox(height: 8),
-            _buildSignOutButton(c),
+            _buildAccountCard(c),
             const SizedBox(height: 24),
           ],
         ),
@@ -885,7 +1013,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildThemeCard(AppColorScheme c) {
     final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark;
+    final icon = switch (themeMode) {
+      ThemeMode.system => Icons.brightness_auto_rounded,
+      ThemeMode.light  => Icons.light_mode_rounded,
+      ThemeMode.dark   => Icons.dark_mode_rounded,
+    };
+    final label = switch (themeMode) {
+      ThemeMode.system => 'Sigue al sistema',
+      ThemeMode.light  => 'Modo claro',
+      ThemeMode.dark   => 'Modo oscuro',
+    };
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -900,49 +1037,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: c.info.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: c.info.withValues(alpha: 0.3),
-                width: 1.5,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: c.info.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: c.info.withValues(alpha: 0.3), width: 1.5),
+                ),
+                child: Icon(icon, color: c.info, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tema', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(label, style: TextStyle(fontSize: 12, color: c.textSecondary)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('Sistema'), icon: Icon(Icons.brightness_auto_rounded, size: 16)),
+              ButtonSegment(value: ThemeMode.light,  label: Text('Claro'),   icon: Icon(Icons.light_mode_rounded, size: 16)),
+              ButtonSegment(value: ThemeMode.dark,   label: Text('Oscuro'),  icon: Icon(Icons.dark_mode_rounded, size: 16)),
+            ],
+            selected: {themeMode},
+            onSelectionChanged: (modes) =>
+                ref.read(themeModeProvider.notifier).set(modes.first),
+            style: ButtonStyle(
+              textStyle: WidgetStatePropertyAll(
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               ),
             ),
-            child: Icon(
-              isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-              color: c.info,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tema',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: c.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isDark ? 'Modo oscuro' : 'Modo claro',
-                  style: TextStyle(fontSize: 12, color: c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: isDark,
-            onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-            activeThumbColor: c.info,
           ),
         ],
       ),
@@ -1135,6 +1269,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: c.cardBorder),
+              _buildNavRow(
+                icon: Icons.tune_rounded,
+                color: c.info,
+                title: 'Calibración de sensores',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const CalibrationScreen()),
+                ),
+                c: c,
+              ),
+              Divider(height: 1, color: c.cardBorder),
+              _buildNavRow(
+                icon: Icons.schedule_rounded,
+                color: c.success,
+                title: 'Programación de actuadores',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const SchedulingScreen()),
+                ),
+                c: c,
               ),
             ],
           ),
@@ -1334,54 +1493,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildSignOutButton(AppColorScheme c) {
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              c.error.withValues(alpha: 0.15),
-              c.error.withValues(alpha: 0.05),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: c.error.withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: c.error.withValues(alpha: 0.12),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+  Widget _buildNavRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required VoidCallback onTap,
+    required AppColorScheme c,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: c.textMuted),
           ],
         ),
-        child: ElevatedButton(
-          onPressed: _signOut,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: c.error,
-            shadowColor: Colors.transparent,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+      ),
+    );
+  }
+
+  Widget _buildAccountCard(AppColorScheme c) {
+    return Container(
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.cardBorder, width: 1.5),
+        boxShadow: [
+          BoxShadow(color: c.cardBorder.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Change password
+          ListTile(
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: c.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.lock_reset_rounded, color: c.primary, size: 20),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            title: Text('Cambiar contraseña', style: TextStyle(color: c.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+            subtitle: Text('Solo cuentas de correo', style: TextStyle(color: c.textMuted, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+            onTap: _changePassword,
           ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.logout_rounded, size: 20),
-              SizedBox(width: 10),
-              Text(
-                'Cerrar sesión',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ],
+          Divider(height: 1, color: c.cardBorder),
+          // Sign out
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: c.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.logout_rounded, color: c.warning, size: 20),
+            ),
+            title: Text('Cerrar sesión', style: TextStyle(color: c.textPrimary, fontSize: 14, fontWeight: FontWeight.w500)),
+            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+            onTap: _signOut,
           ),
-        ),
+          Divider(height: 1, color: c.cardBorder),
+          // Delete account
+          ListTile(
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(bottom: Radius.circular(20))),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: c.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.delete_forever_rounded, color: c.error, size: 20),
+            ),
+            title: Text('Eliminar cuenta', style: TextStyle(color: c.error, fontSize: 14, fontWeight: FontWeight.w500)),
+            subtitle: Text('Acción irreversible', style: TextStyle(color: c.textMuted, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+            onTap: _deleteAccount,
+          ),
+        ],
       ),
     );
   }

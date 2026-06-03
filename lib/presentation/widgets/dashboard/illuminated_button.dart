@@ -31,6 +31,7 @@ class IlluminatedButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return GestureDetector(
       onTap: isLoading
           ? null
@@ -45,10 +46,10 @@ class IlluminatedButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isActive
               ? color.withValues(alpha: 0.15)
-              : AppColors.cardBackground,
+              : c.cardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? color : AppColors.cardBorder,
+            color: isActive ? color : c.cardBorder,
             width: isActive ? 2 : 1.5,
           ),
           boxShadow: isActive
@@ -75,7 +76,7 @@ class IlluminatedButton extends StatelessWidget {
                     duration: const Duration(milliseconds: 200),
                     child: Icon(
                       isManualOverride ? Icons.back_hand : icon,
-                      color: isActive ? color : AppColors.textMuted,
+                      color: isActive ? color : c.textMuted,
                       size: 24,
                     ),
                   ),
@@ -86,7 +87,7 @@ class IlluminatedButton extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: isActive ? color : AppColors.textSecondary,
+                        color: isActive ? color : c.textSecondary,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -120,7 +121,7 @@ class IlluminatedButton extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.warning.withValues(alpha: 0.2),
+                        color: c.warning.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -128,7 +129,7 @@ class IlluminatedButton extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 8,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.warning,
+                          color: c.warning,
                         ),
                       ),
                     ),
@@ -141,7 +142,7 @@ class IlluminatedButton extends StatelessWidget {
                       color: isActive ? color : Colors.transparent,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isActive ? color : AppColors.textMuted,
+                        color: isActive ? color : c.textMuted,
                         width: 1.5,
                       ),
                     ),

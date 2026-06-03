@@ -114,6 +114,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return AppScaffold(
       appBar: AppBar(title: const Text('Verificaci\u00f3n SMS')),
       body: SafeArea(
@@ -123,18 +124,18 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
-              const Text(
+              Text(
                 'Verifica tu tel\u00e9fono',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enviamos un c\u00f3digo SMS a $_phoneNumber',
-                style: const TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: c.textMuted),
               ),
               const SizedBox(height: 32),
               TextField(
@@ -142,10 +143,10 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   letterSpacing: 8,
-                  color: AppColors.textPrimary,
+                  color: c.textPrimary,
                 ),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),

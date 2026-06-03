@@ -1,0 +1,57 @@
+{
+  "rules": {
+    // ── Default: deny everything ─────────────────────────────────────────────
+    ".read": false,
+    ".write": false,
+
+    // ── Live sensor readings (ESP32 writes, app reads) ───────────────────────
+    "sensors": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Sensor history + trend-alert log ────────────────────────────────────
+    "history": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Actuator commands (app writes, ESP32 reads) ──────────────────────────
+    "controls": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Pump / actuator schedules (app writes, ESP32 reads) ──────────────────
+    "schedules": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Sensor calibration factors ────────────────────────────────────────────
+    "calibration": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Active plant profile & thresholds ────────────────────────────────────
+    "profile": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── NFC scan log (ESP32 writes, app reads) ────────────────────────────────
+    "nfc": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    },
+
+    // ── Per-user data: readable/writable only by the owner ───────────────────
+    "usuarios": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}

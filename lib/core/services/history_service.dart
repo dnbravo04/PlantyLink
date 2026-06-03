@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/sensor_data.dart';
 import '../../models/trend_alert.dart';
 import '../firebase_constants.dart';
@@ -56,6 +57,28 @@ class HistoryService {
     );
   }
 
+  /// Stream of the last 20 trend alerts from `history/`, sorted newest first.
+  Stream<List<TrendAlert>> get alertHistoryStream {
+    return _db
+        .ref('history')
+        .orderByChild('timestamp')
+        .limitToLast(200)
+        .onValue
+        .map((event) {
+      final raw = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
+      final list = <TrendAlert>[];
+      raw.forEach((_, value) {
+        if (value is! Map<dynamic, dynamic>) return;
+        if (value['event'] != 'alerta_tendencia') return;
+        try {
+          list.add(TrendAlert.fromMap(value));
+        } catch (_) {}
+      });
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return list.take(20).toList();
+    });
+  }
+
   /// Persist a [TrendAlert] to `history/` for later retrieval.
   ///
   /// Failures are swallowed — alert persistence must never interrupt the
@@ -63,8 +86,8 @@ class HistoryService {
   Future<void> saveAlert(TrendAlert alert) async {
     try {
       await _db.ref('history').push().set(alert.toMap());
-    } catch (_) {
-      // Intentionally silent.
+    } catch (e) {
+      debugPrint('[HistoryService] saveAlert failed: $e');
     }
   }
 }

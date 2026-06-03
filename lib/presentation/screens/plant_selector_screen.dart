@@ -74,7 +74,9 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _searchError = 'No se pudo conectar con el servicio de plantas.';
+          _searchError = e is Exception
+              ? e.toString().replaceFirst('Exception: ', '')
+              : 'No se pudo conectar con el servicio de plantas.';
           _isLoading = false;
         });
       }
@@ -96,23 +98,44 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
           _isLoadingMore = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingMore = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+        final c = AppColors.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo cargar más resultados.'),
+            backgroundColor: c.error,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _selectLocalPlant(PlantProfile planta) async {
     final plantRepo = ref.read(plantRepositoryProvider);
-    await plantRepo.selectPlant(planta);
-    if (mounted) {
-      final c = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${planta.emoji} Perfil ${planta.nombre} activado'),
-          backgroundColor: c.success,
-        ),
-      );
-      Navigator.pop(context);
+    try {
+      await plantRepo.selectPlant(planta);
+      if (mounted) {
+        final c = AppColors.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${planta.emoji} Perfil ${planta.nombre} activado'),
+            backgroundColor: c.success,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        final c = AppColors.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo activar ${planta.nombre}. Verifica tu conexión.'),
+            backgroundColor: c.error,
+          ),
+        );
+      }
     }
   }
 
@@ -125,18 +148,30 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
         species: species,
         onSelect: (plant, perenualId) async {
           Navigator.pop(context); // close sheet
-          await ref
-              .read(plantRepositoryProvider)
-              .selectPlant(plant);
-          if (mounted) {
-            final c = AppColors.of(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('🌱 ${plant.nombre} activado'),
-                backgroundColor: c.success,
-              ),
-            );
-            Navigator.pop(context); // close selector
+          try {
+            await ref
+                .read(plantRepositoryProvider)
+                .selectPlant(plant);
+            if (mounted) {
+              final c = AppColors.of(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('🌱 ${plant.nombre} activado'),
+                  backgroundColor: c.success,
+                ),
+              );
+              Navigator.pop(context); // close selector
+            }
+          } catch (e) {
+            if (mounted) {
+              final c = AppColors.of(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('No se pudo activar ${plant.nombre}. Verifica tu conexión.'),
+                  backgroundColor: c.error,
+                ),
+              );
+            }
           }
         },
         onSave: (plant, perenualId) async {

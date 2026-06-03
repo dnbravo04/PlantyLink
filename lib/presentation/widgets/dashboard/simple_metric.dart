@@ -21,13 +21,14 @@ class SimpleMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: c.cardBackground,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isInRange ? AppColors.success : AppColors.error,
+          color: isInRange ? c.success : c.error,
           width: 1,
         ),
       ),
@@ -35,7 +36,7 @@ class SimpleMetric extends StatelessWidget {
         children: [
           Icon(
             isInRange ? Icons.check_circle : Icons.warning,
-            color: isInRange ? AppColors.success : AppColors.error,
+            color: isInRange ? c.success : c.error,
             size: 32,
           ),
           const SizedBox(height: 8),
@@ -44,7 +45,7 @@ class SimpleMetric extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: isInRange ? AppColors.success : AppColors.error,
+              color: isInRange ? c.success : c.error,
             ),
             textAlign: TextAlign.center,
           ),
@@ -52,7 +53,7 @@ class SimpleMetric extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value!,
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: c.textSecondary),
             ),
           ],
         ],

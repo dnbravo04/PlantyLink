@@ -14,6 +14,7 @@ import '../../data/repositories/sensor_repository_impl.dart';
 import '../../data/repositories/plant_repository_impl.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
+import '../../models/trend_alert.dart';
 
 export 'agronomic_providers.dart';
 
@@ -114,4 +115,11 @@ final connectivityProvider = StreamProvider<bool>((ref) {
   return Connectivity().onConnectivityChanged.map((results) {
     return results.any((r) => r != ConnectivityResult.none);
   });
+});
+
+/// Stream of the last 20 saved trend alerts from Firebase, newest first.
+/// Returns an empty stream in demo mode.
+final alertHistoryProvider = StreamProvider<List<TrendAlert>>((ref) {
+  if (kDemoMode) return Stream.value([]);
+  return ref.watch(historyServiceProvider).alertHistoryStream;
 });

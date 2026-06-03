@@ -23,6 +23,7 @@ class CircularMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = AppColors.of(context);
     final progress = (value / maxValue).clamp(0.0, 1.0);
 
     return SizedBox(
@@ -36,7 +37,7 @@ class CircularMetric extends StatelessWidget {
               painter: _CircularProgressPainter(
                 progress: progress,
                 color: color,
-                backgroundColor: AppColors.textMuted.withValues(alpha: 0.3),
+                backgroundColor: c.textMuted.withValues(alpha: 0.3),
               ),
               child: Center(
                 child: Column(
@@ -46,10 +47,10 @@ class CircularMetric extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${value.toStringAsFixed(1)}$unit',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: c.textPrimary,
                         letterSpacing: -0.3,
                       ),
                     ),
@@ -61,10 +62,10 @@ class CircularMetric extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              color: c.textSecondary,
             ),
           ),
         ],

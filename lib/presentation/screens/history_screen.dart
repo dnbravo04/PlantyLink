@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/sensor_data.dart';
 import '../providers/app_providers.dart';
@@ -10,6 +13,29 @@ import '../widgets/common/app_card.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
+
+  Future<void> _exportCsv(BuildContext context, List<SensorData> history) async {
+    final buf = StringBuffer();
+    buf.writeln('timestamp,temperatura,ph,conductividad,nivel_agua,nivel_fertilizante');
+    final fmt = DateFormat('yyyy-MM-dd HH:mm:ss');
+    for (final s in history) {
+      buf.writeln([
+        fmt.format(s.timestamp),
+        s.temperatura?.toStringAsFixed(2) ?? '',
+        s.ph?.toStringAsFixed(2) ?? '',
+        s.conductividad?.toStringAsFixed(2) ?? '',
+        s.nivelAguaTanque?.toStringAsFixed(1) ?? '',
+        s.nivelFertilizanteTanque?.toStringAsFixed(1) ?? '',
+      ].join(','));
+    }
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/historial_${DateTime.now().millisecondsSinceEpoch}.csv');
+    await file.writeAsString(buf.toString());
+    await Share.shareXFiles(
+      [XFile(file.path, mimeType: 'text/csv')],
+      subject: 'Historial HydroTracker',
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,6 +49,15 @@ class HistoryScreen extends ConsumerWidget {
         title: const Text('Historial de Datos'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          historyAsync.whenData((h) => h).value?.isNotEmpty == true
+              ? IconButton(
+                  tooltip: 'Exportar CSV',
+                  icon: const Icon(Icons.download_rounded),
+                  onPressed: () => _exportCsv(context, historyAsync.value!),
+                )
+              : const SizedBox.shrink(),
+        ],
       ),
       body: historyAsync.when(
         loading: () => Center(

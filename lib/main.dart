@@ -7,6 +7,7 @@ import 'app.dart';
 import 'core/app_config.dart';
 import 'core/demo_data_service.dart';
 import 'core/firebase_constants.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,8 +25,13 @@ void main() async {
     // Firebase may already be initialized (hot restart, etc.).
   }
 
+  // Initialize push notifications (requests permission, registers FCM handlers,
+  // creates Android notification channel). Skipped in demo mode.
+  if (!kDemoMode) {
+    await NotificationService.instance.init();
+  }
+
   // Start in-memory simulation only in demo mode.
-  // In production (kDemoMode = false) no demo data is generated.
   if (kDemoMode) {
     DemoDataService().startSimulation();
   }

@@ -79,17 +79,26 @@ class ProfileService {
     );
   }
 
-  // ── System settings ────────────────────────────────────────────────────────
+  // ── Alert settings (per-user) ──────────────────────────────────────────────
 
   Stream<bool> get alertsEnabledStream {
-    return _db.ref('system/alerts_enabled').onValue.map((event) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Stream.value(true);
+    return _db.ref('usuarios/$uid/alerts_enabled').onValue.map((event) {
       return event.snapshot.value as bool? ?? true;
     });
   }
 
   Future<void> setAlertsEnabled(bool enabled) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return Future.value();
     return RetryPolicy.execute(
-      () => _db.ref('system/alerts_enabled').set(enabled),
+      () => _db.ref('usuarios/$uid/alerts_enabled').set(enabled),
     );
+  }
+
+  /// Removes the user's RTDB data before account deletion.
+  Future<void> deleteUserData(String uid) async {
+    await _db.ref('usuarios/$uid').remove();
   }
 }

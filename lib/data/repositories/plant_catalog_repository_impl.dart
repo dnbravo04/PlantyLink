@@ -41,7 +41,27 @@ class PlantCatalogRepositoryImpl implements PlantCatalogRepository {
       final response = await _api.searchSpecies(_apiKey, query, page: page);
       return (results: response.data, totalPages: response.lastPage);
     } on DioException catch (e) {
-      throw Exception('Error buscando plantas: ${e.message}');
+      final status = e.response?.statusCode;
+      if (status == 401 || status == 403) {
+        throw Exception('Clave de API inválida o plan insuficiente.');
+      }
+      if (status == 429) {
+        throw Exception('Límite de solicitudes excedido. Intenta más tarde.');
+      }
+      final detail = e.message?.isNotEmpty == true
+          ? e.message
+          : e.error?.toString() ?? e.type.name;
+      throw Exception('Error de red: $detail');
+    } catch (e) {
+      // Perenual free plan sometimes returns {"data": "Upgrade Plan..."} — a
+      // String instead of an array — which causes a JSON parse/type error here.
+      final msg = e.toString();
+      if (msg.contains('Upgrade') || msg.contains('upgrade') || msg.contains('type')) {
+        throw Exception(
+          'Plan de API insuficiente. Actualiza tu plan en perenual.com o usa el catálogo local.',
+        );
+      }
+      throw Exception('Error al procesar la respuesta de la API.');
     }
   }
 

@@ -24,7 +24,7 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.of(context).background,
       appBar: appBar,
       body: body,
       floatingActionButton: floatingActionButton,
