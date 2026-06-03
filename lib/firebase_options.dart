@@ -17,7 +17,10 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -48,22 +51,6 @@ class DefaultFirebaseOptions {
         );
     }
   }
-
-  // TODO: Replace these placeholder values with the real web app config.
-  // Steps:
-  //   1. Go to Firebase Console → Project hydrotrack-13047 → Project Settings
-  //   2. Under "Your apps", click "Add app" → Web (</>) and register it
-  //   3. Copy the firebaseConfig object and fill in the values below
-  //   4. Or re-run: flutterfire configure --project=hydrotrack-13047
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REPLACE_WITH_WEB_API_KEY',
-    appId: 'REPLACE_WITH_WEB_APP_ID',        // format: 1:495915712501:web:XXXXXXXX
-    messagingSenderId: '495915712501',
-    projectId: 'hydrotrack-13047',
-    authDomain: 'hydrotrack-13047.firebaseapp.com',
-    storageBucket: 'hydrotrack-13047.firebasestorage.app',
-    databaseURL: 'https://hydrotrack-13047.firebaseio.com',
-  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU',
