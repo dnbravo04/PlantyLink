@@ -156,6 +156,8 @@ class _ChartCard extends StatelessWidget {
       return FlSpot(i.toDouble(), valueExtractor(history[i]));
     });
 
+    if (spots.isEmpty) return const SizedBox.shrink();
+
     final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
     final padding = (maxY - minY) * 0.2;
