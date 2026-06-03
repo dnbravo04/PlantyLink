@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -26,8 +27,8 @@ void main() async {
   }
 
   // Initialize push notifications (requests permission, registers FCM handlers,
-  // creates Android notification channel). Skipped in demo mode.
-  if (!kDemoMode) {
+  // creates Android notification channel). Skipped in demo mode and on web.
+  if (!kDemoMode && !kIsWeb) {
     await NotificationService.instance.init();
   }
 
