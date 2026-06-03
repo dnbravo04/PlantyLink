@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "495915712501",
+    "firebase_url": "https://hydrotrack-13047-default-rtdb.firebaseio.com",
     "project_id": "hydrotrack-13047",
     "storage_bucket": "hydrotrack-13047.firebasestorage.app"
   },
@@ -12,7 +13,20 @@
           "package_name": "com.example.hydrotracker"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "495915712501-8ivn4godraa0brs03srtalj0m472chku.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.hydrotracker",
+            "certificate_hash": "17f19007efd0e17f295be05914b62e8204046ffb"
+          }
+        },
+        {
+          "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU"
@@ -20,7 +34,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:495915712501:android:48cd1ddc31c59156a9eabc",
+        "android_client_info": {
+          "package_name": "com.plantylink.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -1,6 +1,10 @@
 # Secret keys — never commit the real file; use api_keys.dart.example as template
 lib/core/api_keys.dart
 
+# Release keystore — never commit to source control
+android/app/*.jks
+android/app/*.keystore
+
 # Miscellaneous
 *.class
 *.log
