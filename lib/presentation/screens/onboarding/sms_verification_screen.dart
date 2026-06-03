@@ -15,8 +15,8 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
   final _codeController = TextEditingController();
   bool _cargando = false;
   String? _error;
-  late String _verificationId;
-  late String _phoneNumber;
+  String _verificationId = '';
+  String _phoneNumber = '';
 
   @override
   void didChangeDependencies() {
