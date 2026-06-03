@@ -28,7 +28,11 @@ void main() async {
   // Initialize push notifications (requests permission, registers FCM handlers,
   // creates Android notification channel). Skipped in demo mode.
   if (!kDemoMode) {
-    await NotificationService.instance.init();
+    try {
+      await NotificationService.instance.init();
+    } catch (_) {
+      // Notifications are non-critical — app continues without them.
+    }
   }
 
   // Start in-memory simulation only in demo mode.
