@@ -63,11 +63,18 @@ class _PerfilScreenState extends State<PerfilScreen>
       return;
     }
 
-    await db.ref('usuarios/${user.uid}').set({
-      'nombre': nombre,
-      'ciudad': ciudad,
-      'creado': ServerValue.timestamp,
-    });
+    try {
+      await db.ref('usuarios/${user.uid}').set({
+        'nombre': nombre,
+        'ciudad': ciudad,
+        'creado': ServerValue.timestamp,
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() { _error = 'Error al guardar perfil. Intenta de nuevo.'; _cargando = false; });
+      }
+      return;
+    }
 
     if (mounted) Navigator.pushReplacementNamed(context, '/onboarding/welcome');
   }
