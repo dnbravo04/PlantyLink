@@ -9,6 +9,7 @@ import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/common/app_scaffold.dart';
+import '../../app.dart';
 import 'calibration_screen.dart';
 import 'scheduling_screen.dart';
 
@@ -54,7 +55,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _saveUserProfile() async {
     try {
-      await ref.read(profileServiceProvider).updateUserProfile(
+      await ref.read(profileServiceProvider)?.updateUserProfile(
             _nameController.text.trim(),
             _cityController.text.trim(),
           );
@@ -69,7 +70,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _toggleAlerts(bool enabled) async {
     try {
-      await ref.read(profileServiceProvider).setAlertsEnabled(enabled);
+      await ref.read(profileServiceProvider)?.setAlertsEnabled(enabled);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +85,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       await ref
           .read(profileServiceProvider)
-          .updateUserSettings({'modo_visualizacion': mode});
+          ?.updateUserSettings({'modo_visualizacion': mode});
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +99,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       await ref
           .read(profileServiceProvider)
-          .updateUserSettings({'sensores_activos': _activeSensors});
+          ?.updateUserSettings({'sensores_activos': _activeSensors});
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -141,65 +142,71 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final newCtrl     = TextEditingController();
     final confirmCtrl = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final dc = AppColors.of(ctx);
-        return AlertDialog(
-          backgroundColor: dc.cardBackground,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Cambiar contraseña', style: TextStyle(color: dc.textPrimary)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: currentCtrl,
-                obscureText: true,
-                decoration: InputDecoration(labelText: 'Contraseña actual', labelStyle: TextStyle(color: dc.textMuted)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newCtrl,
-                obscureText: true,
-                decoration: InputDecoration(labelText: 'Nueva contraseña', labelStyle: TextStyle(color: dc.textMuted)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmCtrl,
-                obscureText: true,
-                decoration: InputDecoration(labelText: 'Confirmar contraseña', labelStyle: TextStyle(color: dc.textMuted)),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
-            TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Guardar',  style: TextStyle(color: dc.primary))),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) return;
-    final c = AppColors.of(context);
-
-    if (newCtrl.text != confirmCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Las contraseñas no coinciden.'), backgroundColor: c.error));
-      return;
-    }
-    if (newCtrl.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('La contraseña debe tener al menos 6 caracteres.'), backgroundColor: c.error));
-      return;
-    }
-
     try {
-      final cred = EmailAuthProvider.credential(email: user.email!, password: currentCtrl.text);
-      await user.reauthenticateWithCredential(cred);
-      await user.updatePassword(newCtrl.text);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Contraseña actualizada.'), backgroundColor: c.success));
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      final msg = e.code == 'wrong-password' ? 'Contraseña actual incorrecta.' : 'Error: ${e.message}';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: c.error));
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final dc = AppColors.of(ctx);
+          return AlertDialog(
+            backgroundColor: dc.cardBackground,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Cambiar contraseña', style: TextStyle(color: dc.textPrimary)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: 'Contraseña actual', labelStyle: TextStyle(color: dc.textMuted)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: 'Nueva contraseña', labelStyle: TextStyle(color: dc.textMuted)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(labelText: 'Confirmar contraseña', labelStyle: TextStyle(color: dc.textMuted)),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
+              TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Guardar',  style: TextStyle(color: dc.primary))),
+            ],
+          );
+        },
+      );
+
+      if (confirmed != true || !mounted) return;
+      final c = AppColors.of(context);
+
+      if (newCtrl.text != confirmCtrl.text) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Las contraseñas no coinciden.'), backgroundColor: c.error));
+        return;
+      }
+      if (newCtrl.text.length < 6) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('La contraseña debe tener al menos 6 caracteres.'), backgroundColor: c.error));
+        return;
+      }
+
+      try {
+        final cred = EmailAuthProvider.credential(email: user.email!, password: currentCtrl.text);
+        await user.reauthenticateWithCredential(cred);
+        await user.updatePassword(newCtrl.text);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text('Contraseña actualizada.'), backgroundColor: c.success));
+      } on FirebaseAuthException catch (e) {
+        if (!mounted) return;
+        final msg = e.code == 'wrong-password' ? 'Contraseña actual incorrecta.' : 'Error: ${e.message}';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: c.error));
+      }
+    } finally {
+      currentCtrl.dispose();
+      newCtrl.dispose();
+      confirmCtrl.dispose();
     }
   }
 
@@ -231,9 +238,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       final uid = user.uid;
-      await ref.read(profileServiceProvider).deleteUserData(uid);
+      await ref.read(profileServiceProvider)?.deleteUserData(uid);
       await user.delete();
-      if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/onboarding/vinculacion', (route) => false);
+      if (mounted) Navigator.pushNamedAndRemoveUntil(context, AppRoutes.onboardingVinculacion, (route) => false);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       final c = AppColors.of(context);
@@ -286,7 +293,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          '/onboarding/vinculacion',
+          AppRoutes.onboardingVinculacion,
           (route) => false,
         );
       }
@@ -824,7 +831,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       try {
                         await ref
                             .read(plantRepositoryProvider)
-                            .updateThresholds({
+                            ?.updateThresholds({
                           'temp_min': _tempMin,
                           'temp_max': _tempMax,
                           'ph_min': _phMin,
@@ -868,8 +875,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    final catalog =
-                        ref.read(plantRepositoryProvider).availablePlants;
+                    final repo = ref.read(plantRepositoryProvider);
+                    if (repo == null) return;
+                    final catalog = repo.availablePlants;
                     final profile =
                         ref.read(activePlantProfileProvider).value;
                     if (profile == null) return;
@@ -877,7 +885,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       (p) => p.nombre == profile.nombre,
                       orElse: () => profile,
                     );
-                    ref.read(plantRepositoryProvider).selectPlant(match);
+                    repo.selectPlant(match);
                     setState(() => _thresholdInitialized = false);
                   },
                   style: OutlinedButton.styleFrom(
@@ -1248,7 +1256,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 width: double.infinity,
                 child: OutlinedButton(
                   onPressed: () =>
-                      Navigator.pushNamed(context, '/onboarding/esp32'),
+                      Navigator.pushNamed(context, AppRoutes.onboardingEsp32),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: c.info,
                     side: BorderSide(color: c.cardBorder, width: 1.5),

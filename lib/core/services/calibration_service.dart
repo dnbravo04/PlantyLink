@@ -5,7 +5,8 @@ import '../firebase_constants.dart';
 
 /// Reads and writes sensor calibration offsets to Firebase RTDB.
 ///
-/// Path: `calibration/` (shared device scope so the ESP32 can apply them).
+/// Path: `devices/{esp32Id}/calibration/` — scoped per device so the ESP32
+/// can apply them.
 ///
 /// pH uses 2-point linear calibration: the app stores raw readings at two
 /// known buffer solutions (pH 4.0 and 7.0) so the ESP32 (or the app) can
@@ -14,8 +15,9 @@ import '../firebase_constants.dart';
 /// EC uses a single correction factor: measured = raw × factor.
 class CalibrationService {
   late final FirebaseDatabase _db;
+  final String esp32Id;
 
-  CalibrationService() {
+  CalibrationService({required this.esp32Id}) {
     _db = FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL: kFirebaseDatabaseUrl,
@@ -32,7 +34,7 @@ class CalibrationService {
   }) {
     final key = buffer <= 4.5 ? 'ph_low' : 'ph_high';
     final uid = FirebaseAuth.instance.currentUser?.uid ?? 'device';
-    return _db.ref('calibration').update({
+    return _db.ref('devices/$esp32Id/calibration').update({
       '${key}_buffer': buffer,
       '${key}_raw': rawReading,
       'calibrated_by': uid,
@@ -42,7 +44,7 @@ class CalibrationService {
 
   /// Clears both pH calibration points (resets to factory defaults).
   Future<void> clearPhCalibration() {
-    return _db.ref('calibration').update({
+    return _db.ref('devices/$esp32Id/calibration').update({
       'ph_low_buffer': null,
       'ph_low_raw': null,
       'ph_high_buffer': null,
@@ -60,7 +62,7 @@ class CalibrationService {
   }) {
     final factor = rawReading == 0 ? 1.0 : knownEc / rawReading;
     final uid = FirebaseAuth.instance.currentUser?.uid ?? 'device';
-    return _db.ref('calibration').update({
+    return _db.ref('devices/$esp32Id/calibration').update({
       'ec_known': knownEc,
       'ec_raw': rawReading,
       'ec_factor': factor,
@@ -70,7 +72,7 @@ class CalibrationService {
   }
 
   Future<void> clearEcCalibration() {
-    return _db.ref('calibration').update({
+    return _db.ref('devices/$esp32Id/calibration').update({
       'ec_known': null,
       'ec_raw': null,
       'ec_factor': null,
@@ -80,7 +82,7 @@ class CalibrationService {
   // ── Read current calibration ───────────────────────────────────────────────
 
   Stream<Map<String, dynamic>> get calibrationStream {
-    return _db.ref('calibration').onValue.map((event) {
+    return _db.ref('devices/$esp32Id/calibration').onValue.map((event) {
       final raw = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
       return Map<String, dynamic>.from(raw);
     });

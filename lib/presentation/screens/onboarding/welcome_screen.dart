@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../app.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -75,11 +76,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         curve: Curves.easeInOutCubic,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/onboarding/esp32');
+      Navigator.pushReplacementNamed(context, AppRoutes.onboardingEsp32);
     }
   }
 
-  void _skip() => Navigator.pushReplacementNamed(context, '/onboarding/esp32');
+  void _skip() => Navigator.pushReplacementNamed(context, AppRoutes.onboardingEsp32);
 
   @override
   Widget build(BuildContext context) {

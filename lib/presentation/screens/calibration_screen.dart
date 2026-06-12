@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/services/calibration_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
 
-final _calibrationServiceProvider = Provider<CalibrationService>((_) => CalibrationService());
+// CalibrationService provider is now centralized in app_providers.dart
+// as `calibrationServiceProvider` with device-scoped paths.
 
 class CalibrationScreen extends ConsumerStatefulWidget {
   const CalibrationScreen({super.key});
@@ -37,7 +37,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(_calibrationServiceProvider).savePhCalibrationPoint(
+      await ref.read(calibrationServiceProvider)?.savePhCalibrationPoint(
             buffer: buffer,
             rawReading: reading,
           );
@@ -57,7 +57,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(_calibrationServiceProvider).saveEcCalibration(
+      await ref.read(calibrationServiceProvider)?.saveEcCalibration(
             knownEc: knownEc,
             rawReading: reading,
           );
@@ -72,7 +72,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   Future<void> _resetPh() async {
     setState(() => _saving = true);
     try {
-      await ref.read(_calibrationServiceProvider).clearPhCalibration();
+      await ref.read(calibrationServiceProvider)?.clearPhCalibration();
       _snack('Calibración de pH restablecida.');
     } catch (_) {
       _snack('Error al restablecer.', error: true);
@@ -84,7 +84,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   Future<void> _resetEc() async {
     setState(() => _saving = true);
     try {
-      await ref.read(_calibrationServiceProvider).clearEcCalibration();
+      await ref.read(calibrationServiceProvider)?.clearEcCalibration();
       _snack('Calibración de EC restablecida.');
     } catch (_) {
       _snack('Error al restablecer.', error: true);
@@ -105,37 +105,41 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
   // ── EC custom value dialog ─────────────────────────────────────────────────
   Future<void> _showEcDialog() async {
     final ctrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final dc = AppColors.of(ctx);
-        return AlertDialog(
-          backgroundColor: dc.cardBackground,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Solución de referencia EC', style: TextStyle(color: dc.textPrimary)),
-          content: TextField(
-            controller: ctrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: 'Conductividad conocida (mS/cm)',
-              labelStyle: TextStyle(color: dc.textMuted),
-              suffixText: 'mS/cm',
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final dc = AppColors.of(ctx);
+          return AlertDialog(
+            backgroundColor: dc.cardBackground,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Solución de referencia EC', style: TextStyle(color: dc.textPrimary)),
+            content: TextField(
+              controller: ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Conductividad conocida (mS/cm)',
+                labelStyle: TextStyle(color: dc.textMuted),
+                suffixText: 'mS/cm',
+              ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
-            TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Calibrar',  style: TextStyle(color: dc.primary))),
-          ],
-        );
-      },
-    );
-    if (confirmed != true) return;
-    final value = double.tryParse(ctrl.text.replaceAll(',', '.'));
-    if (value == null || value <= 0) {
-      _snack('Valor inválido.', error: true);
-      return;
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancelar', style: TextStyle(color: dc.textSecondary))),
+              TextButton(onPressed: () => Navigator.pop(ctx, true),  child: Text('Calibrar',  style: TextStyle(color: dc.primary))),
+            ],
+          );
+        },
+      );
+      if (confirmed != true) return;
+      final value = double.tryParse(ctrl.text.replaceAll(',', '.'));
+      if (value == null || value <= 0) {
+        _snack('Valor inválido.', error: true);
+        return;
+      }
+      await _calibrateEc(value);
+    } finally {
+      ctrl.dispose();
     }
-    await _calibrateEc(value);
   }
 
   @override
@@ -143,10 +147,13 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     final c = AppColors.of(context);
     final currentPh = _currentPh;
     final currentEc = _currentEc;
-    final calAsync = ref.watch(
-      StreamProvider<Map<String, dynamic>>((r) =>
-          r.read(_calibrationServiceProvider).calibrationStream),
-    );
+    final calService = ref.watch(calibrationServiceProvider);
+    final calAsync = calService == null
+        ? const AsyncValue<Map<String, dynamic>>.data({})
+        : ref.watch(
+            StreamProvider<Map<String, dynamic>>(
+                (r) => calService.calibrationStream),
+          );
     final cal = calAsync.value ?? {};
 
     final phLowRaw    = cal['ph_low_raw'] as num?;

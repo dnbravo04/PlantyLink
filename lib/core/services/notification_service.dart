@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -24,6 +25,8 @@ class NotificationService {
 
   final _fcm = FirebaseMessaging.instance;
   final _local = FlutterLocalNotificationsPlugin();
+  StreamSubscription<RemoteMessage>? _onMessageSub;
+  StreamSubscription<String>? _onTokenRefreshSub;
 
   static const _channelId = 'hydrotracker_alerts';
   static const _channelName = 'Alertas HydroTracker';
@@ -68,7 +71,7 @@ class NotificationService {
     );
 
     // ── Foreground FCM messages → local notification ───────────────────────
-    FirebaseMessaging.onMessage.listen((message) {
+    _onMessageSub = FirebaseMessaging.onMessage.listen((message) {
       final notification = message.notification;
       if (notification == null) return;
       _local.show(
@@ -91,9 +94,15 @@ class NotificationService {
 
     // ── FCM token (useful for server-side targeting) ───────────────────────
     _fcm.getToken().then((token) => debugPrint('[FCM] token: $token'));
-    _fcm.onTokenRefresh.listen(
+    _onTokenRefreshSub = _fcm.onTokenRefresh.listen(
       (token) => debugPrint('[FCM] token refreshed: $token'),
     );
+  }
+
+  /// Cancel active subscriptions. Called if the service is ever torn down.
+  void dispose() {
+    _onMessageSub?.cancel();
+    _onTokenRefreshSub?.cancel();
   }
 
   /// Shows a local notification for a trend alert detected in-app.

@@ -7,6 +7,7 @@ import '../../../core/firebase_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
+import '../../../app.dart';
 
 class PerfilScreen extends StatefulWidget {
   const PerfilScreen({super.key});
@@ -76,7 +77,7 @@ class _PerfilScreenState extends State<PerfilScreen>
       return;
     }
 
-    if (mounted) Navigator.pushReplacementNamed(context, '/onboarding/welcome');
+    if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.onboardingWelcome);
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/phone_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../widgets/common/app_scaffold.dart';
+import '../../../app.dart';
 
 class SmsVerificationScreen extends StatefulWidget {
   const SmsVerificationScreen({super.key});
@@ -45,7 +46,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
       await auth.signInWithCredential(credential);
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/onboarding/perfil');
+        Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -76,7 +77,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen> {
         verificationCompleted: (PhoneAuthCredential credential) async {
           await auth.signInWithCredential(credential);
           if (mounted) {
-            Navigator.pushReplacementNamed(context, '/onboarding/perfil');
+            Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
           }
         },
         verificationFailed: (FirebaseAuthException e) {

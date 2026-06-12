@@ -6,7 +6,7 @@
 ///
 /// QUICK DEV OVERRIDE: If you just want to test locally without --dart-define,
 /// paste your key into [_kDevOverride] (never commit it):
-const String _kDevOverride = 'sk-EJHd6a1b06746a6b917674'; // local dev key
+const String _kDevOverride = ''; // use --dart-define=PERENUAL_API_KEY=your_key
 
 const String kPerenualApiKey = String.fromEnvironment(
   'PERENUAL_API_KEY',

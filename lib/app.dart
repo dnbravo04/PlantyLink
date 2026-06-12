@@ -13,11 +13,12 @@ import 'presentation/screens/onboarding/welcome_screen.dart';
 /// Centralized route definitions.
 sealed class AppRoutes {
   AppRoutes._();
-  static const String login               = '/login';
-  static const String onboardingPerfil    = '/onboarding/perfil';
-  static const String onboardingWelcome   = '/onboarding/welcome';
-  static const String onboardingEsp32     = '/onboarding/esp32';
-  static const String onboardingOtp       = '/onboarding/otp';
+  static const String home                  = '/';
+  static const String login                 = '/login';
+  static const String onboardingPerfil      = '/onboarding/perfil';
+  static const String onboardingWelcome     = '/onboarding/welcome';
+  static const String onboardingEsp32       = '/onboarding/esp32';
+  static const String onboardingOtp         = '/onboarding/otp';
   static const String onboardingVinculacion = '/onboarding/vinculacion';
 }
 
