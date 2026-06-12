@@ -114,6 +114,7 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
 
   Future<void> _selectLocalPlant(PlantProfile planta) async {
     final plantRepo = ref.read(plantRepositoryProvider);
+    if (plantRepo == null) return;
     try {
       await plantRepo.selectPlant(planta);
       if (mounted) {
@@ -151,7 +152,7 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
           try {
             await ref
                 .read(plantRepositoryProvider)
-                .selectPlant(plant);
+                ?.selectPlant(plant);
             if (mounted) {
               final c = AppColors.of(context);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +210,7 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final localPlants = ref.read(plantRepositoryProvider).availablePlants;
+    final localPlants = ref.read(plantRepositoryProvider)?.availablePlants ?? [];
     final userCatalogAsync = ref.watch(userCatalogStreamProvider);
 
     return AppScaffold(

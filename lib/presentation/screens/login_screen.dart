@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/phone_utils.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
+import '../../app.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -84,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen>
       },
       codeSent: (String verificationId, int? _) {
         setState(() => _cargando = false);
-        Navigator.pushNamed(context, '/onboarding/otp', arguments: {
+        Navigator.pushNamed(context, AppRoutes.onboardingOtp, arguments: {
           'verificationId': verificationId,
           'phoneNumber': phone,
           'isLogin': true,
@@ -415,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pushReplacementNamed(
-                        context, '/onboarding/vinculacion'),
+                        context, AppRoutes.onboardingVinculacion),
                     child: Text(
                       'Regístrate',
                       style: TextStyle(

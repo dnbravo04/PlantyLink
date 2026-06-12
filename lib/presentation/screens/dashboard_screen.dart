@@ -26,7 +26,7 @@ class DashboardScreen extends ConsumerWidget {
     final profileAsync = ref.watch(activePlantProfileProvider);
     final visualizationMode = ref.watch(visualizationModeProvider);
     final connectivityAsync = ref.watch(connectivityProvider);
-    final sensorRepo = ref.read(sensorRepositoryProvider);
+    final sensorRepo = ref.read(sensorRepositoryProvider)!;
 
     // Trigger trend checks only when sensorProvider emits a new value —
     // not on every build. ref.listen is the correct Riverpod pattern for

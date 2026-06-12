@@ -3,10 +3,12 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
+import '../../../app.dart';
 
 class Esp32VinculacionScreen extends ConsumerStatefulWidget {
   const Esp32VinculacionScreen({super.key});
@@ -64,22 +66,10 @@ class _Esp32VinculacionScreenState
       if (mounted) {
         setState(() => _isNfcAvailable = avail == NfcAvailability.enabled);
         if (_isNfcAvailable) _startNfcScan();
-        if (!_isNfcAvailable) {
-          setState(() {
-            _exitoso = false;
-            _errorMessage = avail == NfcAvailability.unsupported
-                ? 'Este dispositivo no soporta NFC.'
-                : 'Activa NFC en los ajustes del dispositivo.';
-          });
-        }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isNfcAvailable = false;
-          _exitoso = false;
-          _errorMessage = 'Error al verificar NFC: $e';
-        });
+        setState(() => _isNfcAvailable = false);
         _stopRipples();
       }
     }
@@ -99,7 +89,7 @@ class _Esp32VinculacionScreenState
         pollingOptions: {NfcPollingOption.iso14443, NfcPollingOption.iso15693},
         onDiscovered: (NfcTag tag) async {
           final deviceId = _extractTagId(tag);
-          await _processNfcTag(deviceId);
+          await _processDeviceId(deviceId);
           await NfcManager.instance.stopSession();
         },
       );
@@ -126,7 +116,7 @@ class _Esp32VinculacionScreenState
     return 'esp32-${DateTime.now().millisecondsSinceEpoch}';
   }
 
-  Future<void> _processNfcTag(String deviceId) async {
+  Future<void> _processDeviceId(String deviceId) async {
     try {
       await ref.read(deviceServiceProvider).vincularESP32(deviceId);
       if (mounted) {
@@ -137,7 +127,7 @@ class _Esp32VinculacionScreenState
         });
         _stopRipples();
         Future.delayed(const Duration(milliseconds: 1800), () {
-          if (mounted) Navigator.pushReplacementNamed(context, '/');
+          if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.home);
         });
       }
     } catch (_) {
@@ -171,8 +161,91 @@ class _Esp32VinculacionScreenState
       _isScanning   = false;
       _errorMessage = null;
     });
-    _startNfcScan();
+    if (_isNfcAvailable) {
+      _startNfcScan();
+    }
   }
+
+  // ── Manual ID input ─────────────────────────────────────────────────────
+
+  Future<void> _showManualInputDialog() async {
+    final ctrl = TextEditingController();
+    try {
+      final deviceId = await showDialog<String>(
+        context: context,
+        builder: (ctx) {
+          final c = AppColors.of(ctx);
+          return AlertDialog(
+            backgroundColor: c.cardBackground,
+            title: Text(
+              'Ingresar ID del ESP32',
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                color: c.textPrimary,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Ingresa el ID que se encuentra en la etiqueta '
+                  'de tu dispositivo ESP32.',
+                  style: TextStyle(color: c.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  style: TextStyle(color: c.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Ej: a1:b2:c3:d4:e5',
+                    hintStyle: TextStyle(color: c.textMuted),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: Icon(Icons.memory_rounded, color: c.primary),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancelar', style: TextStyle(color: c.textMuted)),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final text = ctrl.text.trim();
+                  if (text.isNotEmpty) Navigator.pop(ctx, text);
+                },
+                style: FilledButton.styleFrom(backgroundColor: c.primary),
+                child: const Text('Vincular'),
+              ),
+            ],
+          );
+        },
+      );
+      if (deviceId != null && deviceId.isNotEmpty) {
+        await _processDeviceId(deviceId);
+      }
+    } finally {
+      ctrl.dispose();
+    }
+  }
+
+  // ── QR Code scanning ──────────────────────────────────────────────────
+
+  Future<void> _scanQrCode() async {
+    final deviceId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const _QrScannerPage()),
+    );
+    if (deviceId != null && deviceId.isNotEmpty && mounted) {
+      await _processDeviceId(deviceId);
+    }
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +295,7 @@ class _Esp32VinculacionScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: () => Navigator.pushReplacementNamed(context, '/onboarding/welcome'),
+              onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.onboardingWelcome),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -248,7 +321,7 @@ class _Esp32VinculacionScreenState
             Text(
               _isNfcAvailable
                   ? 'Acerca tu teléfono al ESP32'
-                  : 'NFC no disponible en este dispositivo',
+                  : 'Vincula tu dispositivo ESP32',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 color: c.isDark
@@ -286,14 +359,17 @@ class _Esp32VinculacionScreenState
 
             Expanded(child: _buildStateContent(c)),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            if (_exitoso == null || _exitoso == false) ...[
+            // ── Alternative linking methods ──────────────────────
+            if (_exitoso != true) ...[
+              _buildAlternativeMethods(c),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () =>
-                    Navigator.pushReplacementNamed(context, '/'),
+                    Navigator.pushReplacementNamed(context, AppRoutes.home),
                 child: Text(
-                  'Omitir por ahora  →',
+                  'Omitir por ahora  \u2192',
                   style: TextStyle(
                     color: c.textMuted, fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -307,10 +383,87 @@ class _Esp32VinculacionScreenState
     );
   }
 
+  Widget _buildAlternativeMethods(AppColorScheme c) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _scanQrCode,
+                icon: Icon(Icons.qr_code_scanner_rounded, size: 18, color: c.primary),
+                label: Text(
+                  'Escanear QR',
+                  style: TextStyle(color: c.textPrimary, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: c.cardBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _showManualInputDialog,
+                icon: Icon(Icons.keyboard_rounded, size: 18, color: c.primary),
+                label: Text(
+                  'Ingresar ID',
+                  style: TextStyle(color: c.textPrimary, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: c.cardBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildStateContent(AppColorScheme c) {
     if (_exitoso == true) return _buildSuccess(c);
     if (_exitoso == false) return _buildError(c);
-    return _buildScanning(c);
+    if (_isNfcAvailable) return _buildScanning(c);
+    return _buildNoNfc(c);
+  }
+
+  Widget _buildNoNfc(AppColorScheme c) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 96, height: 96,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: c.primary.withValues(alpha: 0.12),
+            border: Border.all(color: c.primary.withValues(alpha: 0.4), width: 2),
+          ),
+          child: Icon(Icons.link_rounded, size: 48, color: c.primary),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Vincula tu ESP32',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'NFC no disponible. Usa una de las\nopciones alternativas para vincular.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: c.textMuted, height: 1.5),
+        ),
+      ],
+    );
   }
 
   Widget _buildScanning(AppColorScheme c) {
@@ -467,6 +620,79 @@ class _Esp32VinculacionScreenState
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── QR Scanner Page ─────────────────────────────────────────────────────────
+
+class _QrScannerPage extends StatefulWidget {
+  const _QrScannerPage();
+
+  @override
+  State<_QrScannerPage> createState() => _QrScannerPageState();
+}
+
+class _QrScannerPageState extends State<_QrScannerPage> {
+  final MobileScannerController _scannerCtrl = MobileScannerController();
+  bool _scanned = false;
+
+  @override
+  void dispose() {
+    _scannerCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: Text(
+          'Escanear código QR',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _scannerCtrl,
+            onDetect: (capture) {
+              if (_scanned) return;
+              final barcodes = capture.barcodes;
+              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
+                _scanned = true;
+                Navigator.pop(context, barcodes.first.rawValue);
+              }
+            },
+          ),
+          Center(
+            child: Container(
+              width: 250, height: 250,
+              decoration: BoxDecoration(
+                border: Border.all(color: c.primary, width: 3),
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 60,
+            left: 0, right: 0,
+            child: Text(
+              'Apunta al código QR del ESP32',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -13,11 +13,11 @@ import '../../domain/repositories/plant_repository.dart';
 ///   - [selectPlant] calls [DemoDataService.changePlant] (no Firebase write).
 ///   - [updateThresholds] is a no-op in demo mode.
 class PlantRepositoryImpl implements PlantRepository {
-  final ProfileService _profileService;
+  final ProfileService? _profileService;
   final DemoDataService? _demo;
 
   PlantRepositoryImpl({
-    required ProfileService profileService,
+    ProfileService? profileService,
     DemoDataService? demoService,
   })  : _profileService = profileService,
         _demo = demoService;
@@ -33,7 +33,7 @@ class PlantRepositoryImpl implements PlantRepository {
           .map((p) => p.nombre)
           .distinct();
     }
-    return _profileService.plantaActivaStream;
+    return _profileService!.plantaActivaStream;
   }
 
   @override
@@ -43,7 +43,7 @@ class PlantRepositoryImpl implements PlantRepository {
           .map((p) => p as PlantProfile?)
           .distinct();
     }
-    return _profileService.thresholdsStream.map((map) {
+    return _profileService!.thresholdsStream.map((map) {
       if (map.isEmpty) return null;
       try {
         return PlantProfile.fromMap(map);
@@ -64,12 +64,12 @@ class PlantRepositoryImpl implements PlantRepository {
       if (index >= 0) _demo!.changePlant(index);
       return;
     }
-    await _profileService.activarPerfil(plant);
+    await _profileService!.activarPerfil(plant);
   }
 
   @override
   Future<void> updateThresholds(Map<String, dynamic> thresholds) async {
     if (_isDemoMode) return; // Threshold persistence is Firebase-only.
-    await _profileService.updateProfileThresholds(thresholds);
+    await _profileService!.updateProfileThresholds(thresholds);
   }
 }

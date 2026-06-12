@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/services/schedule_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/pump_schedule.dart';
+import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
 
@@ -21,20 +21,13 @@ const _actuadorIcons = {
 // 0=Mon … 6=Sun
 const _dayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
-final _scheduleServiceProvider =
-    Provider<ScheduleService>((_) => ScheduleService());
-
-final _schedulesProvider = StreamProvider<List<PumpSchedule>>((ref) {
-  return ref.watch(_scheduleServiceProvider).schedulesStream;
-});
-
 class SchedulingScreen extends ConsumerWidget {
   const SchedulingScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = AppColors.of(context);
-    final schedulesAsync = ref.watch(_schedulesProvider);
+    final schedulesAsync = ref.watch(schedulesProvider);
 
     return AppScaffold(
       appBar: AppBar(
@@ -83,10 +76,10 @@ class SchedulingScreen extends ConsumerWidget {
               return _ScheduleTile(
                 schedule: s,
                 onToggle: (active) => ref
-                    .read(_scheduleServiceProvider)
-                    .updateSchedule(s.copyWith(activo: active)),
+                    .read(scheduleServiceProvider)
+                    ?.updateSchedule(s.copyWith(activo: active)),
                 onDelete: () =>
-                    ref.read(_scheduleServiceProvider).deleteSchedule(s.id!),
+                    ref.read(scheduleServiceProvider)?.deleteSchedule(s.id!),
               );
             },
           );
@@ -99,8 +92,8 @@ class SchedulingScreen extends ConsumerWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) => _ScheduleDialog(
-        onSave: (schedule) =>
-            ref.read(_scheduleServiceProvider).addSchedule(schedule),
+        onSave: (schedule) async =>
+            ref.read(scheduleServiceProvider)?.addSchedule(schedule),
       ),
     );
   }

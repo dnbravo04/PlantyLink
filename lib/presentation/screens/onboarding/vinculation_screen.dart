@@ -5,6 +5,7 @@ import '../../../core/phone_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
+import '../../../app.dart';
 
 class VinculacionScreen extends StatefulWidget {
   const VinculacionScreen({super.key});
@@ -75,7 +76,7 @@ class _VinculacionScreenState extends State<VinculacionScreen>
             );
           } else { rethrow; }
         }
-        if (mounted) Navigator.pushReplacementNamed(context, '/onboarding/perfil');
+        if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
       } else {
         await _verifyPhone(_emailCtrl.text.trim());
       }
@@ -91,14 +92,14 @@ class _VinculacionScreenState extends State<VinculacionScreen>
       phoneNumber: formatPhoneNumber(phone),
       verificationCompleted: (PhoneAuthCredential cred) async {
         await FirebaseAuth.instance.signInWithCredential(cred);
-        if (mounted) Navigator.pushReplacementNamed(context, '/onboarding/perfil');
+        if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() { _error = _mapError(e.code); _cargando = false; });
       },
       codeSent: (String verificationId, int? _) {
         setState(() => _cargando = false);
-        Navigator.pushNamed(context, '/onboarding/otp', arguments: {
+        Navigator.pushNamed(context, AppRoutes.onboardingOtp, arguments: {
           'verificationId': verificationId,
           'phoneNumber': phone,
         });

@@ -109,7 +109,7 @@ class TrendNotifier extends Notifier<TrendAlertState> {
           _lastAlertTime[key] = DateTime.now();
           // Persist to Firebase only in production (demo mode has no auth).
           if (!kDemoMode) {
-            ref.read(historyServiceProvider).saveAlert(alert);
+            ref.read(historyServiceProvider)?.saveAlert(alert);
           }
           // Fire a local push notification so the user is alerted even when
           // the app is in the background or on a different tab.

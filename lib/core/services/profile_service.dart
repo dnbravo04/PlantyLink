@@ -7,12 +7,13 @@ import '../retry_policy.dart';
 
 /// Manages plant profiles and user settings in Firebase RTDB.
 ///
-/// Single responsibility: reads and writes to `profile/` and `usuarios/{uid}/`.
-/// No sensor data, no actuator control.
+/// Single responsibility: reads and writes to `devices/{esp32Id}/profile/`
+/// and `usuarios/{uid}/`. No sensor data, no actuator control.
 class ProfileService {
   late final FirebaseDatabase _db;
+  final String esp32Id;
 
-  ProfileService() {
+  ProfileService({required this.esp32Id}) {
     _db = FirebaseDatabase.instanceFor(
       app: Firebase.app(),
       databaseURL: kFirebaseDatabaseUrl,
@@ -21,31 +22,31 @@ class ProfileService {
 
   // ── Plant profile ──────────────────────────────────────────────────────────
 
-  /// Stream of the active plant name from `profile/planta`.
+  /// Stream of the active plant name from `devices/{esp32Id}/profile/planta`.
   Stream<String> get plantaActivaStream {
-    return _db.ref('profile/planta').onValue.map((event) {
+    return _db.ref('devices/$esp32Id/profile/planta').onValue.map((event) {
       return event.snapshot.value as String? ?? 'Sin configurar';
     });
   }
 
-  /// Stream of the full profile map from `profile/` (thresholds + plant name).
+  /// Stream of the full profile map from `devices/{esp32Id}/profile/`.
   Stream<Map<dynamic, dynamic>> get thresholdsStream {
-    return _db.ref('profile').onValue.map((event) {
+    return _db.ref('devices/$esp32Id/profile').onValue.map((event) {
       return event.snapshot.value as Map<dynamic, dynamic>? ?? {};
     });
   }
 
-  /// Write a complete [PlantProfile] to `profile/`.
+  /// Write a complete [PlantProfile] to `devices/{esp32Id}/profile/`.
   Future<void> activarPerfil(PlantProfile perfil) {
     return RetryPolicy.execute(
-      () => _db.ref('profile').set(perfil.toMap()),
+      () => _db.ref('devices/$esp32Id/profile').set(perfil.toMap()),
     );
   }
 
-  /// Partially update threshold values on `profile/`.
+  /// Partially update threshold values on `devices/{esp32Id}/profile/`.
   Future<void> updateProfileThresholds(Map<String, dynamic> values) {
     return RetryPolicy.execute(
-      () => _db.ref('profile').update(values),
+      () => _db.ref('devices/$esp32Id/profile').update(values),
     );
   }
 

@@ -4,46 +4,23 @@
     ".read": false,
     ".write": false,
 
-    // ── Live sensor readings (ESP32 writes, app reads) ───────────────────────
-    "sensors": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
+    // ── Device-scoped data ──────────────────────────────────────────────────
+    // Access granted only to authenticated users whose linked esp32_id
+    // matches the device node they're trying to read/write.
+    "devices": {
+      "$esp32Id": {
+        ".read":  "auth != null && root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id",
+        ".write": "auth != null && root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id",
 
-    // ── Sensor history + trend-alert log ────────────────────────────────────
-    "history": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
-
-    // ── Actuator commands (app writes, ESP32 reads) ──────────────────────────
-    "controls": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
-
-    // ── Pump / actuator schedules (app writes, ESP32 reads) ──────────────────
-    "schedules": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
-
-    // ── Sensor calibration factors ────────────────────────────────────────────
-    "calibration": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
-
-    // ── Active plant profile & thresholds ────────────────────────────────────
-    "profile": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
-    },
-
-    // ── NFC scan log (ESP32 writes, app reads) ────────────────────────────────
-    "nfc": {
-      ".read":  "auth != null",
-      ".write": "auth != null"
+        "sensors":     { ".validate": true },
+        "history":     { ".validate": true },
+        "controls":    { ".validate": true },
+        "schedules":   { ".validate": true },
+        "profile":     { ".validate": true },
+        "calibration": { ".validate": true },
+        "alerts":      { ".validate": true },
+        "nfc_logs":    { ".validate": true }
+      }
     },
 
     // ── Per-user data: readable/writable only by the owner ───────────────────
@@ -52,6 +29,12 @@
         ".read":  "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
+    },
+
+    // ── Shared API response cache (read/write by any authenticated user) ────
+    "cached": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
     }
   }
 }
