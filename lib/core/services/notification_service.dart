@@ -28,8 +28,8 @@ class NotificationService {
   StreamSubscription<RemoteMessage>? _onMessageSub;
   StreamSubscription<String>? _onTokenRefreshSub;
 
-  static const _channelId = 'hydrotracker_alerts';
-  static const _channelName = 'Alertas HydroTracker';
+  static const _channelId = 'plantylink_alerts';
+  static const _channelName = 'Alertas PlantyLink';
   static const _channelDesc = 'Alertas de tendencia de sensores hidropónicos';
 
   /// Call once from [main] before [runApp].

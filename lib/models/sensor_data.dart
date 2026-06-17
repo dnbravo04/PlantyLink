@@ -30,6 +30,12 @@ class SensorData {
 
   final DateTime timestamp;
 
+  /// Normalized EC in mS/cm. Raw values >10 are assumed to be in µS/cm.
+  double get ecNormalized {
+    final raw = conductividad ?? 0;
+    return raw > 10 ? raw / 1000 : raw;
+  }
+
   SensorData({
     this.temperatura,
     this.nivelAguaTanque,

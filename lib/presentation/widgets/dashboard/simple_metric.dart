@@ -70,8 +70,7 @@ class SimpleMetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ecRaw = sensor.conductividad ?? 0;
-    final ecVal = ecRaw > 10 ? ecRaw / 1000 : ecRaw;
+    final ecVal = sensor.ecNormalized;
 
     final tempInRange = _isTempInRange(sensor.temperatura ?? 0);
     final phInRange = _isPhInRange(sensor.ph ?? 0, profile);

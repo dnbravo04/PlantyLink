@@ -23,11 +23,8 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
       ref.watch(sensorProvider).value?.ph;
 
   // ── EC live reading ───────────────────────────────────────────────────────
-  double? get _currentEc {
-    final raw = ref.watch(sensorProvider).value?.conductividad;
-    if (raw == null) return null;
-    return raw > 10 ? raw / 1000 : raw;
-  }
+  double? get _currentEc =>
+      ref.watch(sensorProvider).value?.ecNormalized;
 
   Future<void> _calibratePh(double buffer) async {
     final reading = _currentPh;
