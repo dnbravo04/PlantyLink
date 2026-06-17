@@ -117,6 +117,31 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Ingresa tu correo para recuperar la contraseña');
+      return;
+    }
+    _setLoading(true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        setState(() => _error = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Se envió un enlace de recuperación a $email'),
+            backgroundColor: AppColors.of(context).success,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() => _error = _mapAuthError(e.code));
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   void _setLoading(bool v) { if (mounted) setState(() => _cargando = v); }
 
   String _mapAuthError(String code) => switch (code) {
@@ -305,6 +330,16 @@ class _LoginScreenState extends State<LoginScreen>
                         : Icons.visibility_off_outlined),
                     onPressed: () =>
                         setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _cargando ? null : _resetPassword,
+                  child: Text(
+                    '¿Olvidaste tu contraseña?',
+                    style: TextStyle(color: c.primary, fontSize: 12),
                   ),
                 ),
               ),

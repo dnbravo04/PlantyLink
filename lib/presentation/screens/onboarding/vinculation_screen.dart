@@ -65,17 +65,9 @@ class _VinculacionScreenState extends State<VinculacionScreen>
           setState(() { _error = 'Las contraseñas no coinciden'; _cargando = false; });
           return;
         }
-        try {
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: _emailCtrl.text.trim(), password: pass,
-          );
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'email-already-in-use') {
-            await FirebaseAuth.instance.signInWithEmailAndPassword(
-              email: _emailCtrl.text.trim(), password: pass,
-            );
-          } else { rethrow; }
-        }
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _emailCtrl.text.trim(), password: pass,
+        );
         if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
       } else {
         await _verifyPhone(_emailCtrl.text.trim());

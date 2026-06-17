@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
 import '../../domain/repositories/sensor_repository.dart';
@@ -83,47 +84,66 @@ class DashboardScreen extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              greeting,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: c.textMuted,
-              ),
-            ),
-            const SizedBox(height: 2),
-            plantaAsync.when(
-              loading: () => Text(
-                'Cargando...',
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: c.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: c.textMuted,
                 ),
               ),
-              error: (_, _) => Text(
-                'PlantyLink',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: c.textPrimary,
+              const SizedBox(height: 2),
+              plantaAsync.when(
+                loading: () => Text(
+                  'Cargando...',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: c.textPrimary,
+                  ),
+                ),
+                error: (_, _) => Text(
+                  'PlantyLink',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: c.textPrimary,
+                  ),
+                ),
+                data: (planta) => Text(
+                  planta,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: c.textPrimary,
+                  ),
                 ),
               ),
-              data: (planta) => Text(
-                planta,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: c.textPrimary,
+              const SizedBox(height: 2),
+              sensorAsync.when(
+                data: (sensor) => Text(
+                  'Última lectura: ${DateFormat('HH:mm:ss').format(sensor.timestamp)}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: c.textMuted,
+                  ),
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => Text(
+                  'Sin datos',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: c.textMuted,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const Spacer(),
         _buildEsp32Chip(sensorAsync, c),
       ],
     );
@@ -201,8 +221,7 @@ class DashboardScreen extends ConsumerWidget {
           return SimpleMetricsGrid(sensor: sensor, profile: profile);
         }
 
-        final ecRaw = sensor.conductividad ?? 0;
-        final ecVal = ecRaw > 10 ? ecRaw / 1000 : ecRaw;
+        final ecVal = sensor.ecNormalized;
 
         return Column(
           children: [
@@ -279,8 +298,7 @@ class DashboardScreen extends ConsumerWidget {
         if (profile == null) return const SizedBox.shrink();
         return sensorAsync.when(
           data: (sensor) {
-            final ecRaw = sensor.conductividad ?? 0;
-            final ec = ecRaw > 10 ? ecRaw / 1000 : ecRaw;
+            final ec = sensor.ecNormalized;
             final outOfRange = ec < profile.ecMin || ec > profile.ecMax;
             if (!outOfRange) return const SizedBox.shrink();
             return Row(
@@ -521,22 +539,69 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildPumpGrid(sensor, sensorRepo, c, enabled: false),
+                  _buildPumpGrid(sensor, sensorRepo, c, context, enabled: false),
                 ],
               );
             }
 
-            return _buildPumpGrid(sensor, sensorRepo, c, enabled: true);
+            return _buildPumpGrid(sensor, sensorRepo, c, context, enabled: true);
           },
         ),
       ],
     );
   }
 
+  Future<void> _confirmDosing(
+    BuildContext context,
+    AppColorScheme c,
+    String label,
+    String pumpKey,
+    bool newState,
+    SensorRepository sensorRepo,
+  ) async {
+    if (!newState) {
+      // Turning off doesn't need confirmation.
+      sensorRepo.togglePump(pumpKey, false);
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: c.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: Icon(Icons.warning_amber_rounded, color: c.warning, size: 36),
+        title: Text(
+          'Activar dosificador de $label',
+          style: TextStyle(color: c.textPrimary, fontSize: 16),
+        ),
+        content: Text(
+          'La dosificación incorrecta puede dañar tu cultivo. '
+          '¿Estás seguro de que deseas activar el dosificador de $label?',
+          style: TextStyle(color: c.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancelar', style: TextStyle(color: c.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: c.warning),
+            child: const Text('Activar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      sensorRepo.togglePump(pumpKey, true);
+    }
+  }
+
   Widget _buildPumpGrid(
     SensorData sensor,
     SensorRepository sensorRepo,
-    AppColorScheme c, {
+    AppColorScheme c,
+    BuildContext context, {
     required bool enabled,
   }) {
     return GridView.count(
@@ -581,9 +646,11 @@ class DashboardScreen extends ConsumerWidget {
           isActive: sensor.bombaDosificadoraAcido ?? false,
           color: c.warning,
           onTap: enabled
-              ? () => sensorRepo.togglePump(
+              ? () => _confirmDosing(
+                    context, c, 'ácido',
                     'bomba_dosificadora_acido',
                     !(sensor.bombaDosificadoraAcido ?? false),
+                    sensorRepo,
                   )
               : null,
           isAutoMode: sensor.dosificadoraAcidoAuto ?? false,
@@ -595,9 +662,11 @@ class DashboardScreen extends ConsumerWidget {
           isActive: sensor.bombaDosificadoraBasico ?? false,
           color: c.success,
           onTap: enabled
-              ? () => sensorRepo.togglePump(
+              ? () => _confirmDosing(
+                    context, c, 'base',
                     'bomba_dosificadora_basico',
                     !(sensor.bombaDosificadoraBasico ?? false),
+                    sensorRepo,
                   )
               : null,
           isAutoMode: sensor.dosificadoraBaseAuto ?? false,

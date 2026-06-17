@@ -33,7 +33,7 @@ class HistoryScreen extends ConsumerWidget {
     await file.writeAsString(buf.toString());
     await Share.shareXFiles(
       [XFile(file.path, mimeType: 'text/csv')],
-      subject: 'Historial HydroTracker',
+      subject: 'Historial PlantyLink',
     );
   }
 
@@ -115,10 +115,7 @@ class HistoryScreen extends ConsumerWidget {
                   title: 'Conductividad EC (mS/cm)',
                   lineColor: c.warning,
                   history: history,
-                  valueExtractor: (s) {
-                    final raw = s.conductividad ?? 0;
-                    return raw > 10 ? raw / 1000 : raw;
-                  },
+                  valueExtractor: (s) => s.ecNormalized,
                   minLimit: profileAsync.value?.ecMin,
                   maxLimit: profileAsync.value?.ecMax,
                 ),
