@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "495915712501-674n41rg5s1u3h65t4h74elqkn7u2f5r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plantylink.app",
+            "certificate_hash": "90be93634fd5b8afcc69f75dffe6e74437cfcf04"
+          }
+        },
+        {
           "client_id": "495915712501-ihfc6u2giilnoanokgf9194d5funj5q3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
