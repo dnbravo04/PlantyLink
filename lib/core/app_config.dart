@@ -8,4 +8,4 @@
 /// Never flip this flag directly in code. Use a build argument instead:
 ///   flutter run  --dart-define=DEMO_MODE=true
 ///   flutter build appbundle --dart-define=DEMO_MODE=false
-const bool kDemoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
+const bool kDemoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: true);

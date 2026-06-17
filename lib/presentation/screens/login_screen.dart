@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/phone_utils.dart';
@@ -15,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _emailController    = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -23,36 +24,59 @@ class _LoginScreenState extends State<LoginScreen>
   bool _usingPhone      = false;
   String? _error;
 
-  late AnimationController _heroAnim;
-  late Animation<double>   _heroFade;
-  late Animation<Offset>   _heroSlide;
+  late AnimationController _entryAnim;
+  late Animation<double>   _logoFade;
+  late Animation<double>   _formFade;
+  late Animation<Offset>   _formSlide;
 
   @override
   void initState() {
     super.initState();
-    _heroAnim = AnimationController(
+    _entryAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1000),
     )..forward();
-    _heroFade  = CurvedAnimation(parent: _heroAnim, curve: Curves.easeOut);
-    _heroSlide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _heroAnim, curve: Curves.easeOutCubic));
+    _logoFade = CurvedAnimation(
+      parent: _entryAnim,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+    );
+    _formFade = CurvedAnimation(
+      parent: _entryAnim,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+    );
+    _formSlide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entryAnim,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
+    ));
   }
 
   @override
   void dispose() {
-    _heroAnim.dispose();
+    _entryAnim.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // ── Validation ──────────────────────────────────────────────────────────────
+  static final _emailRegex = RegExp(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+  );
+  static final _phoneRegex = RegExp(r'^\+?[0-9\s\-()]{7,15}$');
+
   // ── Email/password ─────────────────────────────────────────────────────────
   Future<void> _signInWithEmail() async {
     final email    = _emailController.text.trim();
     final password = _passwordController.text;
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Completa todos los campos');
+    if (email.isEmpty || !_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Ingresa un correo electrónico válido');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => _error = 'Ingresa tu contraseña');
       return;
     }
     _setLoading(true);
@@ -70,8 +94,8 @@ class _LoginScreenState extends State<LoginScreen>
   // ── Phone ──────────────────────────────────────────────────────────────────
   Future<void> _signInWithPhone() async {
     final phone = _emailController.text.trim();
-    if (phone.isEmpty) {
-      setState(() => _error = 'Ingresa tu número de teléfono');
+    if (phone.isEmpty || !_phoneRegex.hasMatch(phone)) {
+      setState(() => _error = 'Ingresa un número de teléfono válido');
       return;
     }
     _setLoading(true);
@@ -107,7 +131,6 @@ class _LoginScreenState extends State<LoginScreen>
         idToken:     googleAuth.idToken,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
-      // Widget may be disposed by AuthGate rebuilding on auth success — stop here.
     } on FirebaseAuthException catch (e) {
       if (mounted) setState(() => _error = _mapAuthError(e.code));
     } catch (_) {
@@ -119,8 +142,8 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _resetPassword() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'Ingresa tu correo para recuperar la contraseña');
+    if (email.isEmpty || !_emailRegex.hasMatch(email)) {
+      setState(() => _error = 'Ingresa un correo válido para recuperar la contraseña');
       return;
     }
     _setLoading(true);
@@ -161,102 +184,16 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: c.background,
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          _buildGradientBackground(c),
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHero(c),
-                Expanded(child: _buildFormSheet(c)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Hero section ───────────────────────────────────────────────────────────
-  Widget _buildGradientBackground(AppColorScheme c) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.42,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: c.isDark
-              ? [const Color(0xFF0A2218), const Color(0xFF07110E)]
-              : [const Color(0xFF059669), const Color(0xFF10B981)],
-        ),
-      ),
-      child: Center(
-        child: Container(
-          width: 220,
-          height: 220,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                c.primary.withValues(alpha: c.isDark ? 0.25 : 0.35),
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHero(AppColorScheme c) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.38,
-      child: FadeTransition(
-        opacity: _heroFade,
-        child: SlideTransition(
-          position: _heroSlide,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 80, height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: c.isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.white.withValues(alpha: 0.25),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    width: 2,
-                  ),
-                ),
-                child: Icon(
-                  Icons.energy_savings_leaf_rounded,
-                  size: 44,
-                  color: c.isDark ? c.primary : Colors.white,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'PlantyLink',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: c.isDark ? c.textPrimary : Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Conecta y cuida tu cultivo',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: c.isDark
-                      ? c.textSecondary
-                      : Colors.white.withValues(alpha: 0.85),
-                ),
-              ),
+              SizedBox(height: MediaQuery.of(context).size.height * 0.06),
+              _buildLogo(c),
+              const SizedBox(height: 40),
+              _buildFormCard(c),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -264,287 +201,453 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Form sheet ─────────────────────────────────────────────────────────────
-  Widget _buildFormSheet(AppColorScheme c) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: c.cardBackground,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, -4),
+  // ── Logo ───────────────────────────────────────────────────────────────────
+  Widget _buildLogo(AppColorScheme c) {
+    return FadeTransition(
+      opacity: _logoFade,
+      child: Column(
+        children: [
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [c.primary, c.success],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: c.primary.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.energy_savings_leaf_rounded,
+              size: 36,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'PlantyLink',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: c.textPrimary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Conecta y cuida tu cultivo',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              color: c.textMuted,
+            ),
           ),
         ],
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Iniciar sesión',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 22, fontWeight: FontWeight.w800,
-                color: c.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _usingPhone ? 'Usa tu número de teléfono' : 'Usa tu correo electrónico',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13, color: c.textMuted,
-              ),
-            ),
-            const SizedBox(height: 24),
+    );
+  }
 
-            // Input field
-            TextField(
-              controller: _emailController,
-              keyboardType: _usingPhone
-                  ? TextInputType.phone
-                  : TextInputType.emailAddress,
-              style: TextStyle(color: c.textPrimary, fontSize: 15),
-              decoration: InputDecoration(
-                labelText: _usingPhone ? 'Número de teléfono' : 'Correo electrónico',
-                prefixIcon: Icon(
-                  _usingPhone ? Icons.phone_outlined : Icons.mail_outline_rounded,
+  // ── Form card ──────────────────────────────────────────────────────────────
+  Widget _buildFormCard(AppColorScheme c) {
+    return FadeTransition(
+      opacity: _formFade,
+      child: SlideTransition(
+        position: _formSlide,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: c.cardBackground,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: c.cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.06),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title
+              Text(
+                'Iniciar sesión',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22, fontWeight: FontWeight.w800,
+                  color: c.textPrimary,
                 ),
               ),
-            ),
+              const SizedBox(height: 4),
+              Text(
+                _usingPhone
+                    ? 'Ingresa tu número de teléfono'
+                    : 'Ingresa tus credenciales',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13, color: c.textMuted,
+                ),
+              ),
+              const SizedBox(height: 24),
 
-            if (!_usingPhone) ...[
-              const SizedBox(height: 14),
+              // ── Method toggle (segmented style) ──
+              _AuthMethodToggle(
+                isPhone: _usingPhone,
+                colors: c,
+                onToggle: () => setState(() {
+                  _usingPhone = !_usingPhone;
+                  _error = null;
+                  _emailController.clear();
+                  _passwordController.clear();
+                }),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Input fields ──
               TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
+                controller: _emailController,
+                keyboardType: _usingPhone
+                    ? TextInputType.phone
+                    : TextInputType.emailAddress,
                 style: TextStyle(color: c.textPrimary, fontSize: 15),
                 decoration: InputDecoration(
-                  labelText: 'Contraseña',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                  labelText: _usingPhone ? 'Número de teléfono' : 'Correo electrónico',
+                  prefixIcon: Icon(
+                    _usingPhone ? Icons.phone_outlined : Icons.mail_outline_rounded,
                   ),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _cargando ? null : _resetPassword,
-                  child: Text(
-                    '¿Olvidaste tu contraseña?',
-                    style: TextStyle(color: c.primary, fontSize: 12),
-                  ),
-                ),
-              ),
-            ],
 
-            // Error message
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: c.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: c.error.withValues(alpha: 0.3)),
+              if (!_usingPhone) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  style: TextStyle(color: c.textPrimary, fontSize: 15),
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _cargando ? null : _resetPassword,
+                    child: Text(
+                      '¿Olvidaste tu contraseña?',
+                      style: TextStyle(color: c.primary, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+
+              // ── Error ──
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                _ErrorBanner(error: _error!, colors: c),
+              ],
+
+              const SizedBox(height: 20),
+
+              // ── Primary CTA ──
+              _PrimaryButton(
+                label: 'Iniciar sesión',
+                loading: _cargando,
+                onPressed: _usingPhone ? _signInWithPhone : _signInWithEmail,
+                colors: c,
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── Divider ──
+              Row(children: [
+                Expanded(child: Divider(color: c.cardBorder, thickness: 1)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Text(
+                    'o continúa con',
+                    style: TextStyle(color: c.textMuted, fontSize: 12),
+                  ),
+                ),
+                Expanded(child: Divider(color: c.cardBorder, thickness: 1)),
+              ]),
+
+              const SizedBox(height: 20),
+
+              // ── Google sign-in ──
+              _GoogleSignInButton(
+                loading: _cargando,
+                onPressed: _signInWithGoogle,
+                colors: c,
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Register link ──
+              Center(
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline_rounded, color: c.error, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    Text(
+                      '¿No tienes cuenta? ',
+                      style: TextStyle(color: c.textMuted, fontSize: 13),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushReplacementNamed(
+                          context, AppRoutes.onboardingVinculacion),
                       child: Text(
-                        _error!,
-                        style: TextStyle(color: c.error, fontSize: 13),
+                        'Regístrate',
+                        style: TextStyle(
+                          color: c.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ],
-
-            const SizedBox(height: 20),
-
-            // Primary CTA
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _cargando
-                    ? null
-                    : (_usingPhone ? _signInWithPhone : _signInWithEmail),
-                style: FilledButton.styleFrom(
-                  backgroundColor: c.primary,
-                  foregroundColor: Colors.white,
-                ),
-                child: _cargando
-                    ? const SizedBox(
-                        height: 22, width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white,
-                        ),
-                      )
-                    : const Text('Iniciar sesión'),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Divider
-            Row(children: [
-              Expanded(child: Divider(color: c.cardBorder, thickness: 1)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'o continúa con',
-                  style: TextStyle(color: c.textMuted, fontSize: 12),
-                ),
-              ),
-              Expanded(child: Divider(color: c.cardBorder, thickness: 1)),
-            ]),
-
-            const SizedBox(height: 16),
-
-            // Google sign-in button (full width)
-            _SocialButton(
-              onPressed: _cargando ? null : _signInWithGoogle,
-              label: 'Continuar con Google',
-              logo: _GoogleLogo(),
-              borderColor: c.cardBorder,
-              backgroundColor: c.cardBackground,
-              textColor: c.textPrimary,
-            ),
-
-            const SizedBox(height: 20),
-
-            // Toggle phone / email
-            Center(
-              child: TextButton(
-                onPressed: () => setState(() {
-                  _usingPhone = !_usingPhone;
-                  _error = null;
-                  _emailController.clear();
-                }),
-                child: Text(
-                  _usingPhone
-                      ? 'Usar correo electrónico'
-                      : 'Usar número de teléfono',
-                  style: TextStyle(color: c.primary, fontSize: 13),
-                ),
-              ),
-            ),
-
-            // Register link
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '¿No tienes cuenta? ',
-                    style: TextStyle(color: c.textMuted, fontSize: 13),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pushReplacementNamed(
-                        context, AppRoutes.onboardingVinculacion),
-                    child: Text(
-                      'Regístrate',
-                      style: TextStyle(
-                        color: c.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Social button ─────────────────────────────────────────────────────────────
-class _SocialButton extends StatelessWidget {
-  final VoidCallback? onPressed;
-  final String label;
-  final Widget logo;
-  final Color borderColor;
-  final Color backgroundColor;
-  final Color textColor;
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared auth widgets — used by both LoginScreen and VinculacionScreen
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  const _SocialButton({
-    required this.onPressed,
-    required this.label,
-    required this.logo,
-    required this.borderColor,
-    required this.backgroundColor,
-    required this.textColor,
+/// Segmented toggle between email and phone auth.
+class _AuthMethodToggle extends StatelessWidget {
+  final bool isPhone;
+  final AppColorScheme colors;
+  final VoidCallback onToggle;
+
+  const _AuthMethodToggle({
+    required this.isPhone,
+    required this.colors,
+    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 1.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            logo,
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+    final c = colors;
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: c.isDark
+            ? c.background
+            : c.cardBorder.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _buildTab(
+            label: 'Correo',
+            icon: Icons.mail_outline_rounded,
+            selected: !isPhone,
+            c: c,
+            onTap: isPhone ? onToggle : null,
+          ),
+          _buildTab(
+            label: 'Teléfono',
+            icon: Icons.phone_outlined,
+            selected: isPhone,
+            c: c,
+            onTap: !isPhone ? onToggle : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required AppColorScheme c,
+    required VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: selected ? c.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: selected
+                ? [BoxShadow(
+                    color: c.primary.withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  )]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? Colors.white : c.textMuted,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? Colors.white : c.textMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _GoogleLogo extends StatelessWidget {
+/// Animated primary CTA button.
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final bool loading;
+  final VoidCallback onPressed;
+  final AppColorScheme colors;
+
+  const _PrimaryButton({
+    required this.label,
+    required this.loading,
+    required this.onPressed,
+    required this.colors,
+  });
+
   @override
   Widget build(BuildContext context) {
+    final c = colors;
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: loading ? null : onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: c.primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: c.primary.withValues(alpha: 0.5),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: loading
+              ? const SizedBox(
+                  key: ValueKey('loading'),
+                  height: 22, width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5, color: Colors.white,
+                  ),
+                )
+              : Text(label, key: ValueKey(label)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Error banner with icon.
+class _ErrorBanner extends StatelessWidget {
+  final String error;
+  final AppColorScheme colors;
+
+  const _ErrorBanner({required this.error, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
     return Container(
-      width: 20, height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 2,
+        color: c.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: c.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              error,
+              style: TextStyle(color: c.error, fontSize: 13, fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),
-      child: const Center(
-        child: Text(
-          'G',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF4285F4),
+    );
+  }
+}
+
+/// Google sign-in button with official SVG logo.
+class _GoogleSignInButton extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onPressed;
+  final AppColorScheme colors;
+
+  const _GoogleSignInButton({
+    required this.loading,
+    required this.onPressed,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Material(
+      color: c.isDark ? c.cardBackground : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: loading ? null : onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.cardBorder, width: 1.5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SvgPicture.asset(
+                'lib/core/theme/Google logo.svg',
+                width: 20,
+                height: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Continuar con Google',
+                style: GoogleFonts.plusJakartaSans(
+                  color: c.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),

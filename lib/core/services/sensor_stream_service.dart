@@ -19,11 +19,14 @@ class SensorStreamService {
   }
 
   /// Continuous stream of live sensor readings from `devices/{esp32Id}/sensors/`.
+  ///
+  /// Uses [distinct] to skip duplicate emissions when sensor values haven't
+  /// changed between ticks, reducing unnecessary widget rebuilds.
   Stream<SensorData> get sensorStream {
     return _db.ref('devices/$esp32Id/sensors').onValue.map((event) {
       final data = event.snapshot.value as Map<dynamic, dynamic>? ?? {};
       return SensorData.fromMap(data);
-    });
+    }).distinct();
   }
 
   /// Emits `true` when the most-recent sensor timestamp is older than

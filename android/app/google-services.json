@@ -8,49 +8,28 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:495915712501:android:bc93226d35c66ee2a9eabc",
-        "android_client_info": {
-          "package_name": "com.example.hydrotracker"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "495915712501-8ivn4godraa0brs03srtalj0m472chku.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.hydrotracker",
-            "certificate_hash": "17f19007efd0e17f295be05914b62e8204046ffb"
-          }
-        },
-        {
-          "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:495915712501:android:48cd1ddc31c59156a9eabc",
         "android_client_info": {
           "package_name": "com.plantylink.app"
         }
       },
       "oauth_client": [
+        {
+          "client_id": "495915712501-1ga1c19p1flr06ckpdj3ske1pvtqeqch.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plantylink.app",
+            "certificate_hash": "69642eddb8f1a396bc5be29c65208c52896397ef"
+          }
+        },
+        {
+          "client_id": "495915712501-ihfc6u2giilnoanokgf9194d5funj5q3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.plantylink.app",
+            "certificate_hash": "5d86bed3edb4056bfea26f2bf3d0436ab5c4666b"
+          }
+        },
         {
           "client_id": "495915712501-g1f9c3fiivklccmh03c8plbogbmf9hv1.apps.googleusercontent.com",
           "client_type": 3

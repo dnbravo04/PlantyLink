@@ -45,14 +45,47 @@ class HistoryService {
     });
   }
 
+  /// Maximum number of history entries to keep per device.
+  /// Older entries are pruned after each write.
+  static const int _maxHistoryEntries = 2880; // ~24h at 30s intervals
+
   /// Append a snapshot of [data] to `devices/{esp32Id}/history/`.
   ///
   /// Retries on transient failures. Called periodically by
   /// [SensorRepositoryImpl] in production mode.
-  Future<void> appendSensorReading(SensorData data) {
-    return RetryPolicy.execute(
+  /// After writing, prunes entries beyond [_maxHistoryEntries].
+  Future<void> appendSensorReading(SensorData data) async {
+    await RetryPolicy.execute(
       () => _db.ref('devices/$esp32Id/history').push().set(data.toMap()),
     );
+    // Fire-and-forget pruning — failures must not block the main flow.
+    _pruneOldEntries();
+  }
+
+  Future<void> _pruneOldEntries() async {
+    try {
+      final ref = _db.ref('devices/$esp32Id/history');
+      final snapshot = await ref.orderByChild('timestamp').limitToFirst(1).get();
+      if (!snapshot.exists) return;
+
+      // Only prune if we have more than the limit.
+      final countSnap = await ref.get();
+      if (!countSnap.exists) return;
+      final count = (countSnap.value as Map?)?.length ?? 0;
+      if (count <= _maxHistoryEntries) return;
+
+      final excess = count - _maxHistoryEntries;
+      final oldestSnap = await ref.orderByChild('timestamp').limitToFirst(excess).get();
+      if (!oldestSnap.exists) return;
+
+      final updates = <String, dynamic>{};
+      (oldestSnap.value as Map).forEach((key, _) {
+        updates[key.toString()] = null; // null deletes the key
+      });
+      await ref.update(updates);
+    } catch (e) {
+      debugPrint('[HistoryService] pruneOldEntries failed: $e');
+    }
   }
 
   /// Stream of the last 20 trend alerts from `devices/{esp32Id}/alerts/`,

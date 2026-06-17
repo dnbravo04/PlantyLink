@@ -101,6 +101,43 @@ class SensorData {
     );
   }
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SensorData &&
+          temperatura == other.temperatura &&
+          ph == other.ph &&
+          conductividad == other.conductividad &&
+          nivelAguaTanque == other.nivelAguaTanque &&
+          nivelFertilizanteTanque == other.nivelFertilizanteTanque &&
+          nivelAgua == other.nivelAgua &&
+          conectado == other.conectado &&
+          bombaAgua == other.bombaAgua &&
+          bombaFertilizante == other.bombaFertilizante &&
+          bombaDosificadoraAcido == other.bombaDosificadoraAcido &&
+          bombaDosificadoraBasico == other.bombaDosificadoraBasico &&
+          bombaAguaAuto == other.bombaAguaAuto &&
+          bombaFertilizanteAuto == other.bombaFertilizanteAuto &&
+          dosificadoraAcidoAuto == other.dosificadoraAcidoAuto &&
+          dosificadoraBaseAuto == other.dosificadoraBaseAuto &&
+          bombaAguaManualOverride == other.bombaAguaManualOverride &&
+          bombaFertilizanteManualOverride == other.bombaFertilizanteManualOverride &&
+          dosificadoraAcidoManualOverride == other.dosificadoraAcidoManualOverride &&
+          dosificadoraBaseManualOverride == other.dosificadoraBaseManualOverride;
+
+  @override
+  int get hashCode => Object.hash(
+        temperatura, ph, conductividad,
+        nivelAguaTanque, nivelFertilizanteTanque,
+        nivelAgua, conectado,
+        bombaAgua, bombaFertilizante,
+        bombaDosificadoraAcido, bombaDosificadoraBasico,
+        bombaAguaAuto, bombaFertilizanteAuto,
+        dosificadoraAcidoAuto, dosificadoraBaseAuto,
+        bombaAguaManualOverride, bombaFertilizanteManualOverride,
+        dosificadoraAcidoManualOverride, dosificadoraBaseManualOverride,
+      );
+
   Map<String, dynamic> toMap() {
     return {
       'temperatura': temperatura,
