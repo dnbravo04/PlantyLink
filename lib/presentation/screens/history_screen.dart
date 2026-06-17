@@ -6,13 +6,39 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_color_scheme.dart';
 import '../../models/sensor_data.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
 
-class HistoryScreen extends ConsumerWidget {
+enum _TimeRange {
+  h1('1h', Duration(hours: 1)),
+  h6('6h', Duration(hours: 6)),
+  h24('24h', Duration(hours: 24)),
+  d7('7d', Duration(days: 7)),
+  all('Todo', Duration.zero);
+
+  const _TimeRange(this.label, this.duration);
+  final String label;
+  final Duration duration;
+}
+
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  _TimeRange _selectedRange = _TimeRange.all;
+
+  List<SensorData> _filterByRange(List<SensorData> history) {
+    if (_selectedRange == _TimeRange.all) return history;
+    final cutoff = DateTime.now().subtract(_selectedRange.duration);
+    return history.where((s) => s.timestamp.isAfter(cutoff)).toList();
+  }
 
   Future<void> _exportCsv(BuildContext context, List<SensorData> history) async {
     final buf = StringBuffer();
@@ -38,7 +64,7 @@ class HistoryScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final historyAsync = ref.watch(historyStreamProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
     final c = AppColors.of(context);
@@ -89,40 +115,96 @@ class HistoryScreen extends ConsumerWidget {
             );
           }
 
+          final filtered = _filterByRange(history);
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                _ChartCard(
-                  title: 'Temperatura (°C)',
-                  lineColor: c.success,
-                  history: history,
-                  valueExtractor: (s) => s.temperatura ?? 0,
-                  minLimit: profileAsync.value?.tempMin,
-                  maxLimit: profileAsync.value?.tempMax,
-                ),
-                const SizedBox(height: 20),
-                _ChartCard(
-                  title: 'pH',
-                  lineColor: c.info,
-                  history: history,
-                  valueExtractor: (s) => s.ph ?? 0,
-                  minLimit: profileAsync.value?.phMin,
-                  maxLimit: profileAsync.value?.phMax,
-                ),
-                const SizedBox(height: 20),
-                _ChartCard(
-                  title: 'Conductividad EC (mS/cm)',
-                  lineColor: c.warning,
-                  history: history,
-                  valueExtractor: (s) => s.ecNormalized,
-                  minLimit: profileAsync.value?.ecMin,
-                  maxLimit: profileAsync.value?.ecMax,
-                ),
+                _buildTimeRangeSelector(c),
+                const SizedBox(height: 16),
+                if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Text(
+                      'Sin datos en este rango de tiempo',
+                      style: TextStyle(color: c.textMuted, fontSize: 14),
+                    ),
+                  )
+                else ...[
+                  _ChartCard(
+                    title: 'Temperatura (°C)',
+                    lineColor: c.success,
+                    history: filtered,
+                    valueExtractor: (s) => s.temperatura ?? 0,
+                    minLimit: profileAsync.value?.tempMin,
+                    maxLimit: profileAsync.value?.tempMax,
+                  ),
+                  const SizedBox(height: 20),
+                  _ChartCard(
+                    title: 'pH',
+                    lineColor: c.info,
+                    history: filtered,
+                    valueExtractor: (s) => s.ph ?? 0,
+                    minLimit: profileAsync.value?.phMin,
+                    maxLimit: profileAsync.value?.phMax,
+                  ),
+                  const SizedBox(height: 20),
+                  _ChartCard(
+                    title: 'Conductividad EC (mS/cm)',
+                    lineColor: c.warning,
+                    history: filtered,
+                    valueExtractor: (s) => s.ecNormalized,
+                    minLimit: profileAsync.value?.ecMin,
+                    maxLimit: profileAsync.value?.ecMax,
+                  ),
+                ],
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildTimeRangeSelector(AppColorScheme c) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.cardBorder),
+      ),
+      child: Row(
+        children: _TimeRange.values.map((range) {
+          final selected = range == _selectedRange;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedRange = range),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: selected ? c.primary.withValues(alpha: 0.15) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: selected
+                      ? Border.all(color: c.primary.withValues(alpha: 0.4))
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    range.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                      color: selected ? c.primary : c.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -170,7 +252,6 @@ class _ChartCard extends StatelessWidget {
         ? (history.length / 5).floorToDouble().clamp(1.0, double.infinity)
         : 1.0;
 
-    // Theme-aware grid/border colors
     final gridColor = c.cardBorder.withValues(alpha: 0.5);
     final limitLineColor = c.textMuted.withValues(alpha: 0.5);
 
