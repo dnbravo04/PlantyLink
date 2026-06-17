@@ -5,17 +5,15 @@ import '../providers/navigation_provider.dart';
 import '../providers/trend_alert_provider.dart';
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
-import 'plant_selector_screen.dart';
 import 'settings_screen.dart';
 
 /// Main app shell with bottom navigation bar.
-/// Replaces the old pattern of pushing screens individually.
+/// 3 tabs: Monitor, Historial, Sistema.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
   static const _screens = [
     DashboardScreen(),
-    PlantSelectorScreen(),
     HistoryScreen(),
     SettingsScreen(),
   ];
@@ -58,12 +56,7 @@ class MainShell extends ConsumerWidget {
               isLabelVisible: hasActiveAlerts,
               child: const Icon(Icons.dashboard_rounded),
             ),
-            label: 'Inicio',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.eco_outlined),
-            selectedIcon: Icon(Icons.eco_rounded),
-            label: 'Plantas',
+            label: 'Monitor',
           ),
           const NavigationDestination(
             icon: Icon(Icons.show_chart_outlined),
@@ -71,9 +64,9 @@ class MainShell extends ConsumerWidget {
             label: 'Historial',
           ),
           const NavigationDestination(
-            icon: Icon(Icons.tune_outlined),
-            selectedIcon: Icon(Icons.tune_rounded),
-            label: 'Ajustes',
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: 'Sistema',
           ),
         ],
       ),
