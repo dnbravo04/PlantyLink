@@ -4,15 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
-import '../../domain/repositories/sensor_repository.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/trend_alert.dart';
 import '../providers/app_providers.dart';
 import '../providers/trend_alert_provider.dart';
 import '../widgets/common/app_scaffold.dart';
-import '../widgets/dashboard/illuminated_button.dart';
-import 'scheduling_screen.dart';
 import '../widgets/dashboard/simple_metric.dart';
 import '../widgets/dashboard/sensor_card.dart';
 
@@ -26,21 +23,48 @@ class DashboardScreen extends ConsumerWidget {
     final plantaAsync = ref.watch(plantaActivaProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
     final visualizationMode = ref.watch(visualizationModeProvider);
-    final connectivityAsync = ref.watch(connectivityProvider);
-    final sensorRepo = ref.read(sensorRepositoryProvider)!;
+
+    final sensorRepo = ref.read(sensorRepositoryProvider);
 
     // Trigger trend checks only when sensorProvider emits a new value —
     // not on every build. ref.listen is the correct Riverpod pattern for
     // side effects from provider changes.
-    ref.listen<AsyncValue<SensorData>>(sensorProvider, (_, next) {
-      next.whenData((sensor) {
-        final trendNotifier = ref.read(trendAlertProvider.notifier);
-        trendNotifier.addSensorReading(sensor);
-        trendNotifier.checkTrendAlerts(
-          ref.read(activePlantProfileProvider).value,
-        );
+    if (sensorRepo != null) {
+      ref.listen<AsyncValue<SensorData>>(sensorProvider, (_, next) {
+        next.whenData((sensor) {
+          final trendNotifier = ref.read(trendAlertProvider.notifier);
+          trendNotifier.addSensorReading(sensor);
+          trendNotifier.checkTrendAlerts(
+            ref.read(activePlantProfileProvider).value,
+          );
+        });
       });
-    });
+    }
+
+    if (sensorRepo == null) {
+      return AppScaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.sensors_off_rounded, size: 64, color: c.textMuted),
+                  const SizedBox(height: 16),
+                  Text('Sin dispositivo vinculado',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                  const SizedBox(height: 8),
+                  Text('Vincula tu ESP32 desde Sistema → Mi dispositivo para comenzar a monitorear.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return AppScaffold(
       body: SafeArea(
@@ -58,8 +82,6 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               _buildTrendAlerts(ref, c),
               _buildAlertHistory(ref, context, c),
-              const SizedBox(height: 16),
-              _buildPumpControls(sensorAsync, sensorRepo, connectivityAsync, c, context),
               const Spacer(),
             ],
           ),
@@ -415,264 +437,6 @@ class DashboardScreen extends ConsumerWidget {
           children: alerts.take(5).map((a) => _AlertHistoryTile(alert: a, c: c)).toList(),
         ),
       ),
-    );
-  }
-
-  Widget _buildPumpControls(
-    AsyncValue<SensorData> sensorAsync,
-    SensorRepository sensorRepo,
-    AsyncValue<bool> connectivityAsync,
-    AppColorScheme c,
-    BuildContext context,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Control de Bombas',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: c.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            connectivityAsync.when(
-              data: (isOnline) => Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isOnline ? c.success : c.error,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  isOnline ? 'En línea' : 'Sin conexión',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, _) => const SizedBox.shrink(),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const SchedulingScreen()),
-              ),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: c.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: c.primary.withValues(alpha: 0.3), width: 1),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.schedule_rounded, color: c.primary, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Programar',
-                      style: TextStyle(
-                        color: c.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        sensorAsync.when(
-          loading: () => const SizedBox(
-            height: 40,
-            child: Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-          error: (_, _) => Text(
-            'Error de conexión',
-            style: TextStyle(color: c.textSecondary),
-          ),
-          data: (sensor) {
-            final isOnline = connectivityAsync.value ?? true;
-
-            if (!isOnline) {
-              return Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: c.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: c.warning.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.wifi_off, color: c.warning, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Controles deshabilitados - Sin conexión a internet',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: c.warning,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildPumpGrid(sensor, sensorRepo, c, context, enabled: false),
-                ],
-              );
-            }
-
-            return _buildPumpGrid(sensor, sensorRepo, c, context, enabled: true);
-          },
-        ),
-      ],
-    );
-  }
-
-  Future<void> _confirmDosing(
-    BuildContext context,
-    AppColorScheme c,
-    String label,
-    String pumpKey,
-    bool newState,
-    SensorRepository sensorRepo,
-  ) async {
-    if (!newState) {
-      // Turning off doesn't need confirmation.
-      sensorRepo.togglePump(pumpKey, false);
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: c.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        icon: Icon(Icons.warning_amber_rounded, color: c.warning, size: 36),
-        title: Text(
-          'Activar dosificador de $label',
-          style: TextStyle(color: c.textPrimary, fontSize: 16),
-        ),
-        content: Text(
-          'La dosificación incorrecta puede dañar tu cultivo. '
-          '¿Estás seguro de que deseas activar el dosificador de $label?',
-          style: TextStyle(color: c.textSecondary, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancelar', style: TextStyle(color: c.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: c.warning),
-            child: const Text('Activar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      sensorRepo.togglePump(pumpKey, true);
-    }
-  }
-
-  Widget _buildPumpGrid(
-    SensorData sensor,
-    SensorRepository sensorRepo,
-    AppColorScheme c,
-    BuildContext context, {
-    required bool enabled,
-  }) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      childAspectRatio: 3.2,
-      children: [
-        IlluminatedButton(
-          label: 'Agua',
-          icon: Icons.water_drop,
-          isActive: sensor.bombaAgua ?? false,
-          color: c.info,
-          onTap: enabled
-              ? () => sensorRepo.togglePump(
-                    'bomba_agua',
-                    !(sensor.bombaAgua ?? false),
-                  )
-              : null,
-          isAutoMode: sensor.bombaAguaAuto ?? false,
-          isManualOverride: sensor.bombaAguaManualOverride ?? false,
-        ),
-        IlluminatedButton(
-          label: 'Fertilizante',
-          icon: Icons.eco,
-          isActive: sensor.bombaFertilizante ?? false,
-          color: c.accent,
-          onTap: enabled
-              ? () => sensorRepo.togglePump(
-                    'bomba_fertilizante',
-                    !(sensor.bombaFertilizante ?? false),
-                  )
-              : null,
-          isAutoMode: sensor.bombaFertilizanteAuto ?? false,
-          isManualOverride: sensor.bombaFertilizanteManualOverride ?? false,
-        ),
-        IlluminatedButton(
-          label: 'Ácido',
-          icon: Icons.science,
-          isActive: sensor.bombaDosificadoraAcido ?? false,
-          color: c.warning,
-          onTap: enabled
-              ? () => _confirmDosing(
-                    context, c, 'ácido',
-                    'bomba_dosificadora_acido',
-                    !(sensor.bombaDosificadoraAcido ?? false),
-                    sensorRepo,
-                  )
-              : null,
-          isAutoMode: sensor.dosificadoraAcidoAuto ?? false,
-          isManualOverride: sensor.dosificadoraAcidoManualOverride ?? false,
-        ),
-        IlluminatedButton(
-          label: 'Base',
-          icon: Icons.local_drink,
-          isActive: sensor.bombaDosificadoraBasico ?? false,
-          color: c.success,
-          onTap: enabled
-              ? () => _confirmDosing(
-                    context, c, 'base',
-                    'bomba_dosificadora_basico',
-                    !(sensor.bombaDosificadoraBasico ?? false),
-                    sensorRepo,
-                  )
-              : null,
-          isAutoMode: sensor.dosificadoraBaseAuto ?? false,
-          isManualOverride: sensor.dosificadoraBaseManualOverride ?? false,
-        ),
-      ],
     );
   }
 

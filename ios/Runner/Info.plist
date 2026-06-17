@@ -54,9 +54,9 @@
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>NFCReaderUsageDescription</key>
-	<string>HydroTracker necesita NFC para vincular tu dispositivo ESP32.</string>
+	<string>PlantyLink necesita NFC para vincular tu dispositivo ESP32.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>HydroTracker necesita acceso a la cámara para escanear códigos QR del dispositivo ESP32.</string>
+	<string>PlantyLink necesita acceso a la cámara para escanear códigos QR del dispositivo ESP32.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

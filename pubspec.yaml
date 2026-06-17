@@ -23,6 +23,7 @@ dependencies:
   google_fonts: ^6.2.1
   google_sign_in: ^6.2.2
   mobile_scanner: ^6.0.2
+  flutter_svg: ^2.0.17
   share_plus: ^10.1.4
   path_provider: ^2.1.5
   dio: ^5.4.0
@@ -41,3 +42,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/core/theme/Google logo.svg

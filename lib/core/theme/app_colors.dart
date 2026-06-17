@@ -59,7 +59,7 @@ sealed class AppColors {
     textPrimary:    Color(0xFF022C22),
     textSecondary:  Color(0xFF065F46),
     textMuted:      Color(0xFF6B7280),
-    textDisabled:   Color(0xFFD1FAE5),
+    textDisabled:   Color(0xFF9CA3AF), // Gray-400 — visible on white/light-green backgrounds
   );
 
   /// Returns the scheme matching the current [BuildContext] brightness.

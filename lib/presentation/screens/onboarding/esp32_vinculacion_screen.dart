@@ -31,6 +31,9 @@ class _Esp32VinculacionScreenState
   String? _esp32Id;
   String? _errorMessage;
 
+  /// True when opened from settings (not onboarding).
+  bool get _isFromSettings => Navigator.of(context).canPop();
+
   @override
   void initState() {
     super.initState();
@@ -116,7 +119,25 @@ class _Esp32VinculacionScreenState
     return 'esp32-${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  /// Validates that the device ID is a safe, plausible identifier.
+  /// Allows hex colon-separated (NFC), alphanumeric-dash (QR), or MAC-like formats.
+  static final _validDeviceIdPattern = RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9:\-_]{2,63}$');
+
+  bool _isValidDeviceId(String id) => _validDeviceIdPattern.hasMatch(id);
+
   Future<void> _processDeviceId(String deviceId) async {
+    if (!_isValidDeviceId(deviceId)) {
+      if (mounted) {
+        setState(() {
+          _exitoso = false;
+          _isScanning = false;
+          _errorMessage = 'ID inválido. Debe ser alfanumérico (3-64 caracteres).';
+        });
+        _stopRipples();
+      }
+      return;
+    }
+
     try {
       await ref.read(deviceServiceProvider).vincularESP32(deviceId);
       if (mounted) {
@@ -127,7 +148,12 @@ class _Esp32VinculacionScreenState
         });
         _stopRipples();
         Future.delayed(const Duration(milliseconds: 1800), () {
-          if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.home);
+          if (!mounted) return;
+          if (_isFromSettings) {
+            Navigator.pop(context);
+          } else {
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+          }
         });
       }
     } catch (_) {
@@ -216,7 +242,15 @@ class _Esp32VinculacionScreenState
               FilledButton(
                 onPressed: () {
                   final text = ctrl.text.trim();
-                  if (text.isNotEmpty) Navigator.pop(ctx, text);
+                  if (text.isEmpty) return;
+                  if (!_isValidDeviceId(text)) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: const Text('ID inválido. Solo letras, números, ":", "-" o "_" (3-64 caracteres).'),
+                      backgroundColor: AppColors.of(ctx).error,
+                    ));
+                    return;
+                  }
+                  Navigator.pop(ctx, text);
                 },
                 style: FilledButton.styleFrom(backgroundColor: c.primary),
                 child: const Text('Vincular'),
@@ -251,7 +285,7 @@ class _Esp32VinculacionScreenState
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     return PopScope(
-      canPop: false,
+      canPop: _isFromSettings,
       child: Scaffold(
       backgroundColor: c.background,
       body: Stack(
@@ -295,7 +329,9 @@ class _Esp32VinculacionScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: () => Navigator.pushReplacementNamed(context, AppRoutes.onboardingWelcome),
+              onTap: () => _isFromSettings
+                  ? Navigator.pop(context)
+                  : Navigator.pushReplacementNamed(context, AppRoutes.onboardingWelcome),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -354,8 +390,10 @@ class _Esp32VinculacionScreenState
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
         child: Column(
           children: [
-            OnboardingStepIndicator(currentStep: 3, colors: c),
-            const SizedBox(height: 32),
+            if (!_isFromSettings) ...[
+              OnboardingStepIndicator(currentStep: 3, colors: c),
+              const SizedBox(height: 32),
+            ],
 
             Expanded(child: _buildStateContent(c)),
 
@@ -365,17 +403,29 @@ class _Esp32VinculacionScreenState
             if (_exitoso != true) ...[
               _buildAlternativeMethods(c),
               const SizedBox(height: 12),
-              TextButton(
-                onPressed: () =>
-                    Navigator.pushReplacementNamed(context, AppRoutes.home),
-                child: Text(
-                  'Omitir por ahora  \u2192',
-                  style: TextStyle(
-                    color: c.textMuted, fontSize: 13,
-                    fontWeight: FontWeight.w500,
+              if (_isFromSettings)
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancelar',
+                    style: TextStyle(
+                      color: c.textMuted, fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              else
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pushReplacementNamed(context, AppRoutes.home),
+                  child: Text(
+                    'Omitir por ahora  \u2192',
+                    style: TextStyle(
+                      color: c.textMuted, fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
             ],
           ],
         ),

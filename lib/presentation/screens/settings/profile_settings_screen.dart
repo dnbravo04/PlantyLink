@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../providers/app_providers.dart';
@@ -198,10 +199,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     try {
       final uid = user.uid;
       await ref.read(profileServiceProvider)?.deleteUserData(uid);
+      await GoogleSignIn().signOut();
       await user.delete();
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
-            context, AppRoutes.onboardingVinculacion, (route) => false);
+            context, AppRoutes.home, (route) => false);
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -246,10 +248,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     );
 
     if (confirmed == true) {
+      await GoogleSignIn().signOut();
       await FirebaseAuth.instance.signOut();
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
-            context, AppRoutes.onboardingVinculacion, (route) => false);
+            context, AppRoutes.home, (route) => false);
       }
     }
   }
