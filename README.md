@@ -1,6 +1,34 @@
-# PlantyLink
+# PlantyLink 🌱
 
-Hydroponic monitoring app built with Flutter. Connects to an ESP32 device over NFC, streams real-time sensor data (pH, temperature, EC, tank levels) from Firebase Realtime Database, and enriches plant profiles via the Perenual plant catalog API.
+Hydroponic monitoring app that bridges hardware and software: pairs with an ESP32 sensor device over NFC, streams real-time data (pH, temperature, EC, tank levels) through Firebase, and enriches each plant's profile with care data from an external plant catalog API.
+
+Built to explore a real question: **what does it take for software to actually understand a living growing system, not just display numbers on a dashboard?**
+
+## Highlights
+
+- 🔌 **Hardware integration** — NFC pairing with ESP32 sensor devices, no manual setup required
+- 📡 **Real-time data** — live sensor streaming via Firebase Realtime Database
+- 🌿 **Smart plant profiles** — automatically enriched with species-specific care data via the Perenual API
+- 🎮 **Demo mode** — full app walkthrough with synthetic data, no hardware or backend needed (great for quick evaluation — see below)
+- 🏗️ **Clean architecture** — layered structure (services → repositories → providers) using Riverpod 3.x for state management
+
+## Try it without any setup
+
+```bash
+flutter run --dart-define=DEMO_MODE=true
+```
+
+This runs the full app experience with synthetic sensor data — no Firebase project, no API key, no physical device needed.
+
+## Stack
+
+Flutter · Dart · Firebase (Realtime Database + Auth) · Riverpod 3.x · Retrofit · Freezed · Perenual API
+
+---
+
+## Full Setup & Developer Documentation
+
+*Everything below is for running the app with real Firebase/hardware integration, or for contributing to the codebase.*
 
 ---
 
