@@ -158,6 +158,14 @@ final activePlantProfileProvider = StreamProvider<PlantProfile?>((ref) {
   return repo.activePlantProfileStream;
 });
 
+/// Stream of the active crop's planting date. Emits null when unset or when
+/// no device is linked. Used to derive the current [GrowthStage].
+final plantingDateProvider = StreamProvider<DateTime?>((ref) {
+  final repo = ref.watch(plantRepositoryProvider);
+  if (repo == null) return Stream.value(null);
+  return repo.plantingDateStream;
+});
+
 /// Stream of the current user's Firestore profile.
 /// Returns an empty stream in demo mode (no auth required).
 final userProfileProvider = StreamProvider<Map<String, dynamic>>((ref) {

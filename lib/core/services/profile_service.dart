@@ -50,6 +50,28 @@ class ProfileService {
     );
   }
 
+  /// Stream of the crop's planting date from
+  /// `devices/{esp32Id}/profile/fecha_siembra`. Emits null when unset.
+  Stream<DateTime?> get plantingDateStream {
+    return _db
+        .ref('devices/$esp32Id/profile/fecha_siembra')
+        .onValue
+        .map((event) {
+      final v = event.snapshot.value;
+      return v is num ? DateTime.fromMillisecondsSinceEpoch(v.toInt()) : null;
+    });
+  }
+
+  /// Persist the crop's planting date to
+  /// `devices/{esp32Id}/profile/fecha_siembra` (millis since epoch).
+  Future<void> setPlantingDate(DateTime date) {
+    return RetryPolicy.execute(
+      () => _db
+          .ref('devices/$esp32Id/profile/fecha_siembra')
+          .set(date.millisecondsSinceEpoch),
+    );
+  }
+
   // ── User settings ──────────────────────────────────────────────────────────
 
   /// Stream of the current user's profile document from `usuarios/{uid}`.

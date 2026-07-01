@@ -18,4 +18,10 @@ abstract class PlantRepository {
 
   /// Update threshold values on the active profile without changing the plant name.
   Future<void> updateThresholds(Map<String, dynamic> thresholds);
+
+  /// Stream of the active crop's planting date. Emits null when unset.
+  Stream<DateTime?> get plantingDateStream;
+
+  /// Persist the active crop's planting date.
+  Future<void> setPlantingDate(DateTime date);
 }

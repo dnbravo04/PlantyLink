@@ -72,4 +72,21 @@ class PlantRepositoryImpl implements PlantRepository {
     if (_isDemoMode) return; // Threshold persistence is Firebase-only.
     await _profileService!.updateProfileThresholds(thresholds);
   }
+
+  @override
+  Stream<DateTime?> get plantingDateStream {
+    if (_isDemoMode) {
+      return _demo!.plantingDateStream.map((d) => d as DateTime?);
+    }
+    return _profileService!.plantingDateStream;
+  }
+
+  @override
+  Future<void> setPlantingDate(DateTime date) async {
+    if (_isDemoMode) {
+      _demo!.setPlantingDate(date);
+      return;
+    }
+    await _profileService!.setPlantingDate(date);
+  }
 }

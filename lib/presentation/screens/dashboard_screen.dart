@@ -78,7 +78,7 @@ class DashboardScreen extends ConsumerWidget {
                   FilledButton.icon(
                     onPressed: () {
                       AppHaptics.light();
-                      ref.read(selectedTabIndexProvider.notifier).select(2);
+                      ref.read(selectedTabIndexProvider.notifier).select(3);
                     },
                     icon: const Icon(Icons.memory_rounded, size: 18),
                     label: const Text('Ir a Sistema'),

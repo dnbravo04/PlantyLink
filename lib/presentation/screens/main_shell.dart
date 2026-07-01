@@ -4,12 +4,13 @@ import '../../core/utils/haptics.dart';
 import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/trend_alert_provider.dart';
+import 'agronomic_screen.dart';
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
 /// Main app shell with bottom navigation bar and animated tab transitions.
-/// 3 tabs: Monitor, Historial, Sistema.
+/// 4 tabs: Monitor, Historial, Agronomía, Sistema.
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
@@ -21,6 +22,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   static const _screens = [
     DashboardScreen(),
     HistoryScreen(),
+    AgronomicScreen(),
     SettingsScreen(),
   ];
 
@@ -97,6 +99,11 @@ class _MainShellState extends ConsumerState<MainShell> {
             icon: Icon(Icons.show_chart_outlined),
             selectedIcon: Icon(Icons.show_chart_rounded),
             label: 'Historial',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.eco_outlined),
+            selectedIcon: Icon(Icons.eco_rounded),
+            label: 'Agronomía',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
