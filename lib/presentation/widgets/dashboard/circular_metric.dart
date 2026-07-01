@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Circular progress gauge for sensor readings.
@@ -47,7 +48,7 @@ class CircularMetric extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${value.toStringAsFixed(1)}$unit',
-                      style: TextStyle(
+                      style: GoogleFonts.spaceGrotesk(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                         color: c.textPrimary,

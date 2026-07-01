@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/haptics.dart';
 import '../../../app.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -70,6 +71,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   void _next() {
+    AppHaptics.light();
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
@@ -80,7 +82,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     }
   }
 
-  void _skip() => Navigator.pushReplacementNamed(context, AppRoutes.onboardingEsp32);
+  void _skip() {
+    AppHaptics.light();
+    Navigator.pushReplacementNamed(context, AppRoutes.onboardingEsp32);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,7 +132,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: _pages.length,
-                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  onPageChanged: (i) {
+                    AppHaptics.selection();
+                    setState(() => _currentPage = i);
+                  },
                   itemBuilder: (context, index) =>
                       _buildPage(_pages[index], c, index == _currentPage),
                 ),
@@ -197,7 +205,22 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Widget _buildPage(_OnboardingData page, AppColorScheme c, bool isActive) {
-    return Padding(
+    // Parallax: listen to page controller for horizontal offset
+    return AnimatedBuilder(
+      animation: _pageController,
+      builder: (context, child) {
+        double parallaxOffset = 0;
+        if (_pageController.position.haveDimensions) {
+          final pageIndex = _pages.indexOf(page);
+          final currentPage = _pageController.page ?? 0.0;
+          parallaxOffset = (currentPage - pageIndex) * 40; // 40px parallax
+        }
+        return Transform.translate(
+          offset: Offset(parallaxOffset, 0),
+          child: child,
+        );
+      },
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 36),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -283,6 +306,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ],
       ),
+    ),
     );
   }
 }

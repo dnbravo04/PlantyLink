@@ -133,6 +133,11 @@ class TrendNotifier extends Notifier<TrendAlertState> {
     return DateTime.now().difference(last) >= _minAlertInterval;
   }
 
+  void dismissAlert(TrendAlert alert) {
+    final updated = state.alerts.where((a) => a != alert).toList();
+    state = state.copyWith(alerts: updated);
+  }
+
   void clearAlerts() {
     state = const TrendAlertState();
   }

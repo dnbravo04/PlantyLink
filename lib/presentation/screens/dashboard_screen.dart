@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/utils/haptics.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/trend_alert.dart';
 import '../providers/app_providers.dart';
+import '../providers/navigation_provider.dart';
 import '../providers/trend_alert_provider.dart';
 import '../widgets/common/app_scaffold.dart';
+import '../widgets/common/animated_app_card.dart';
+import '../widgets/common/shimmer_placeholder.dart';
 import '../widgets/dashboard/simple_metric.dart';
 import '../widgets/dashboard/sensor_card.dart';
 
@@ -23,12 +29,10 @@ class DashboardScreen extends ConsumerWidget {
     final plantaAsync = ref.watch(plantaActivaProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
     final visualizationMode = ref.watch(visualizationModeProvider);
+    final userAsync = ref.watch(userProfileProvider);
 
     final sensorRepo = ref.read(sensorRepositoryProvider);
 
-    // Trigger trend checks only when sensorProvider emits a new value —
-    // not on every build. ref.listen is the correct Riverpod pattern for
-    // side effects from provider changes.
     if (sensorRepo != null) {
       ref.listen<AsyncValue<SensorData>>(sensorProvider, (_, next) {
         next.whenData((sensor) {
@@ -41,6 +45,7 @@ class DashboardScreen extends ConsumerWidget {
       });
     }
 
+    // ── Empty state: no device linked ──
     if (sensorRepo == null) {
       return AppScaffold(
         body: SafeArea(
@@ -50,14 +55,39 @@ class DashboardScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.sensors_off_rounded, size: 64, color: c.textMuted),
-                  const SizedBox(height: 16),
+                  // Illustrated empty state
+                  Container(
+                    width: 120, height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: c.primary.withValues(alpha: 0.08),
+                    ),
+                    child: Icon(Icons.eco_rounded, size: 56, color: c.primary.withValues(alpha: 0.4)),
+                  ),
+                  const SizedBox(height: 24),
                   Text('Sin dispositivo vinculado',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary)),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 20, fontWeight: FontWeight.w700, color: c.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Vincula tu ESP32 desde Sistema → Mi dispositivo para comenzar a monitorear.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                  Text(
+                    'Vincula tu ESP32 para comenzar a\nmonitorear tu cultivo en tiempo real.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: c.textMuted, height: 1.5),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () {
+                      AppHaptics.light();
+                      ref.read(selectedTabIndexProvider.notifier).select(2);
+                    },
+                    icon: const Icon(Icons.memory_rounded, size: 18),
+                    label: const Text('Ir a Sistema'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: c.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -67,22 +97,31 @@ class DashboardScreen extends ConsumerWidget {
     }
 
     return AppScaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: RefreshIndicator(
+        color: c.primary,
+        backgroundColor: c.cardBackground,
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          // Force re-read — Riverpod stream will emit new data
+          ref.invalidate(sensorProvider);
+          await Future.delayed(const Duration(milliseconds: 600));
+        },
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               const SizedBox(height: 12),
-              _buildHeader(plantaAsync, sensorAsync, context, c),
-              const SizedBox(height: 20),
+              _buildHeader(plantaAsync, sensorAsync, userAsync, c),
+              const SizedBox(height: 16),
+              _DashboardViewToggle(visualizationMode: visualizationMode),
+              const SizedBox(height: 16),
               _buildMetrics(sensorAsync, profileAsync, visualizationMode, c),
               const SizedBox(height: 8),
               _buildAlert(sensorAsync, profileAsync, c),
               const SizedBox(height: 8),
               _buildTrendAlerts(ref, c),
               _buildAlertHistory(ref, context, c),
-              const Spacer(),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -90,10 +129,12 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  // ── Header with user name ─────────────────────────────────────────────
+
   Widget _buildHeader(
     AsyncValue<String> plantaAsync,
     AsyncValue<SensorData> sensorAsync,
-    BuildContext context,
+    AsyncValue<Map<String, dynamic>> userAsync,
     AppColorScheme c,
   ) {
     final hour = DateTime.now().hour;
@@ -103,15 +144,45 @@ class DashboardScreen extends ConsumerWidget {
             ? 'Buenas tardes'
             : 'Buenas noches';
 
+    final userName = userAsync.whenOrNull(
+      data: (u) => u['nombre']?.toString(),
+    );
+    final greetingText = userName != null && userName.isNotEmpty
+        ? '$greeting, $userName'
+        : greeting;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // Avatar
+        if (userName != null && userName.isNotEmpty) ...[
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [c.primary, c.accent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                userName[0].toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                greeting,
+                greetingText,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -123,25 +194,19 @@ class DashboardScreen extends ConsumerWidget {
                 loading: () => Text(
                   'Cargando...',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
+                    fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
                   ),
                 ),
                 error: (_, _) => Text(
                   'PlantyLink',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
+                    fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
                   ),
                 ),
                 data: (planta) => Text(
                   planta,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: c.textPrimary,
+                    fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
                   ),
                 ),
               ),
@@ -149,18 +214,12 @@ class DashboardScreen extends ConsumerWidget {
               sensorAsync.when(
                 data: (sensor) => Text(
                   'Última lectura: ${DateFormat('HH:mm:ss').format(sensor.timestamp)}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    color: c.textMuted,
-                  ),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: c.textMuted),
                 ),
                 loading: () => const SizedBox.shrink(),
                 error: (_, _) => Text(
                   'Sin datos',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    color: c.textMuted,
-                  ),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: c.textMuted),
                 ),
               ),
             ],
@@ -192,8 +251,7 @@ class DashboardScreen extends ConsumerWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: (connected ? c.success : c.error)
-                          .withValues(alpha: 0.5),
+                      color: (connected ? c.success : c.error).withValues(alpha: 0.5),
                       blurRadius: 4,
                     ),
                   ],
@@ -203,9 +261,7 @@ class DashboardScreen extends ConsumerWidget {
               Text(
                 connected ? 'Conectado' : 'Sin conexión',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: c.textSecondary,
+                  fontSize: 11, fontWeight: FontWeight.w600, color: c.textSecondary,
                 ),
               ),
             ],
@@ -217,6 +273,8 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  // ── Metrics ─────────────────────────────────────────────────────────────
+
   Widget _buildMetrics(
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
@@ -224,17 +282,9 @@ class DashboardScreen extends ConsumerWidget {
     AppColorScheme c,
   ) {
     return sensorAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(c.success),
-        ),
-      ),
+      loading: () => const DashboardShimmer(),
       error: (_, _) => Center(
-        child: Text(
-          'Error de conexión',
-          style: TextStyle(color: c.textSecondary),
-        ),
+        child: Text('Error de conexión', style: TextStyle(color: c.textSecondary)),
       ),
       data: (sensor) {
         final profile = profileAsync.value;
@@ -247,68 +297,83 @@ class DashboardScreen extends ConsumerWidget {
 
         return Column(
           children: [
-            // 2×2 grid for critical sensors
             Row(children: [
               Expanded(
-                child: SensorCard(
-                  label: 'Temperatura',
-                  value: (sensor.temperatura ?? 0).toStringAsFixed(1),
-                  unit: '°C',
-                  icon: Icons.thermostat_outlined,
-                  statusColor: _tempColor(sensor.temperatura ?? 0, c),
-                  isInRange: true,
+                child: AnimatedAppCard(
+                  delay: 0,
+                  child: SensorCard(
+                    label: 'Temperatura',
+                    value: (sensor.temperatura ?? 0).toStringAsFixed(1),
+                    unit: '°C',
+                    icon: Icons.thermostat_outlined,
+                    statusColor: _tempColor(sensor.temperatura ?? 0, c),
+                    isInRange: true,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: SensorCard(
-                  label: 'pH',
-                  value: (sensor.ph ?? 0).toStringAsFixed(1),
-                  unit: '',
-                  icon: Icons.science_outlined,
-                  statusColor: _phColor(sensor.ph ?? 0, profile, c),
-                  isInRange: profile == null ||
-                      ((sensor.ph ?? 0) >= profile.phMin &&
-                          (sensor.ph ?? 0) <= profile.phMax),
+                child: AnimatedAppCard(
+                  delay: 80,
+                  child: SensorCard(
+                    label: 'pH',
+                    value: (sensor.ph ?? 0).toStringAsFixed(1),
+                    unit: '',
+                    icon: Icons.science_outlined,
+                    statusColor: _phColor(sensor.ph ?? 0, profile, c),
+                    isInRange: profile == null ||
+                        ((sensor.ph ?? 0) >= profile.phMin &&
+                            (sensor.ph ?? 0) <= profile.phMax),
+                  ),
                 ),
               ),
             ]),
             const SizedBox(height: 10),
             Row(children: [
               Expanded(
-                child: SensorCard(
-                  label: 'Conductividad',
-                  value: ecVal.toStringAsFixed(2),
-                  unit: 'mS/cm',
-                  icon: Icons.electric_bolt_outlined,
-                  statusColor: _ecColor(ecVal, profile, c),
-                  isInRange: profile == null ||
-                      (ecVal >= profile.ecMin && ecVal <= profile.ecMax),
+                child: AnimatedAppCard(
+                  delay: 160,
+                  child: SensorCard(
+                    label: 'Conductividad',
+                    value: ecVal.toStringAsFixed(2),
+                    unit: 'mS/cm',
+                    icon: Icons.electric_bolt_outlined,
+                    statusColor: _ecColor(ecVal, profile, c),
+                    isInRange: profile == null ||
+                        (ecVal >= profile.ecMin && ecVal <= profile.ecMax),
+                  ),
                 ),
               ),
             ]),
             const SizedBox(height: 10),
-            // Tank levels as fill bars
-            TankLevelCard(
-              label: 'Tanque de agua',
-              sublabel: _levelLabel(sensor.nivelAguaTanque ?? 0),
-              percent: sensor.nivelAguaTanque ?? 0,
-              icon: Icons.water_drop_rounded,
-              color: _levelColor(sensor.nivelAguaTanque ?? 0, c),
+            AnimatedAppCard(
+              delay: 240,
+              child: TankLevelCard(
+                label: 'Tanque de agua',
+                sublabel: _levelLabel(sensor.nivelAguaTanque ?? 0),
+                percent: sensor.nivelAguaTanque ?? 0,
+                icon: Icons.water_drop_rounded,
+                color: _levelColor(sensor.nivelAguaTanque ?? 0, c),
+              ),
             ),
             const SizedBox(height: 10),
-            TankLevelCard(
-              label: 'Fertilizante',
-              sublabel: _levelLabel(sensor.nivelFertilizanteTanque ?? 0),
-              percent: sensor.nivelFertilizanteTanque ?? 0,
-              icon: Icons.eco_rounded,
-              color: _levelColor(sensor.nivelFertilizanteTanque ?? 0, c),
+            AnimatedAppCard(
+              delay: 320,
+              child: TankLevelCard(
+                label: 'Fertilizante',
+                sublabel: _levelLabel(sensor.nivelFertilizanteTanque ?? 0),
+                percent: sensor.nivelFertilizanteTanque ?? 0,
+                icon: Icons.eco_rounded,
+                color: _levelColor(sensor.nivelFertilizanteTanque ?? 0, c),
+              ),
             ),
           ],
         );
       },
     );
   }
+
+  // ── Alerts ──────────────────────────────────────────────────────────────
 
   Widget _buildAlert(
     AsyncValue<SensorData> sensorAsync,
@@ -323,28 +388,30 @@ class DashboardScreen extends ConsumerWidget {
             final ec = sensor.ecNormalized;
             final outOfRange = ec < profile.ecMin || ec > profile.ecMax;
             if (!outOfRange) return const SizedBox.shrink();
-            return Row(
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  color: c.warning,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'EC ${ec.toStringAsFixed(2)} mS/cm fuera de rango. '
-                    'Óptimo: ${profile.ecMin} – ${profile.ecMax} mS/cm',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.warning,
-                      fontWeight: FontWeight.w500,
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: c.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+                border: Border.all(color: c.warning.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: c.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'EC ${ec.toStringAsFixed(2)} mS/cm fuera de rango. '
+                      'Óptimo: ${profile.ecMin} – ${profile.ecMax} mS/cm',
+                      style: TextStyle(
+                        fontSize: 12, color: c.warning, fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
           loading: () => const SizedBox.shrink(),
@@ -368,45 +435,53 @@ class DashboardScreen extends ConsumerWidget {
         Text(
           'Alertas de tendencia',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: c.textPrimary,
+            fontSize: 14, fontWeight: FontWeight.w600, color: c.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         ...alerts.map(
-          (alert) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Container(
-              padding: const EdgeInsets.all(12),
+          (alert) => Dismissible(
+            key: ValueKey(alert.hashCode),
+            direction: DismissDirection.endToStart,
+            onDismissed: (_) {
+              AppHaptics.light();
+              ref.read(trendAlertProvider.notifier).dismissAlert(alert);
+            },
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 16),
+              margin: const EdgeInsets.only(bottom: 4),
               decoration: BoxDecoration(
-                color: c.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: c.warning.withValues(alpha: 0.3),
-                ),
+                color: c.error.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppTokens.radiusSm),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.trending_up_rounded,
-                    color: c.warning,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      alert.message,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: c.warning,
-                        fontWeight: FontWeight.w500,
+              child: Icon(Icons.delete_outline_rounded, color: c.error, size: 20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: c.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                  border: Border.all(color: c.warning.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.trending_up_rounded, color: c.warning, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        alert.message,
+                        style: TextStyle(
+                          fontSize: 12, color: c.warning, fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -429,9 +504,7 @@ class DashboardScreen extends ConsumerWidget {
           title: Text(
             'Historial de alertas (${alerts.length})',
             style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: c.textMuted,
+              fontSize: 13, fontWeight: FontWeight.w600, color: c.textMuted,
             ),
           ),
           children: alerts.take(5).map((a) => _AlertHistoryTile(alert: a, c: c)).toList(),
@@ -439,6 +512,8 @@ class DashboardScreen extends ConsumerWidget {
       ),
     );
   }
+
+  // ── Color helpers ─────────────────────────────────────────────────────
 
   Color _tempColor(double temp, AppColorScheme c) {
     if (temp < 15 || temp > 30) return c.error;
@@ -467,6 +542,91 @@ class DashboardScreen extends ConsumerWidget {
     if (level < 20) return 'Nivel crítico';
     if (level < 50) return 'Nivel bajo';
     return 'Nivel óptimo';
+  }
+}
+
+// ── Dashboard view toggle (segmented control) ──────────────────────────────
+
+class _DashboardViewToggle extends ConsumerWidget {
+  final String visualizationMode;
+  const _DashboardViewToggle({required this.visualizationMode});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+        border: Border.all(color: c.cardBorder),
+      ),
+      child: Row(
+        children: [
+          _buildSegment(
+            label: 'Detalle',
+            icon: Icons.speed_outlined,
+            selected: visualizationMode != 'sencilla',
+            c: c,
+            onTap: () {
+              AppHaptics.selection();
+              ref.read(profileServiceProvider)?.updateUserSettings(
+                  {'modo_visualizacion': 'tecnica'});
+            },
+          ),
+          _buildSegment(
+            label: 'Resumen',
+            icon: Icons.grid_view_rounded,
+            selected: visualizationMode == 'sencilla',
+            c: c,
+            onTap: () {
+              AppHaptics.selection();
+              ref.read(profileServiceProvider)?.updateUserSettings(
+                  {'modo_visualizacion': 'sencilla'});
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegment({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required AppColorScheme c,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppTokens.durationFast,
+          curve: AppTokens.curveSnappy,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? c.primary.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16,
+                  color: selected ? c.primary : c.textMuted),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  color: selected ? c.primary : c.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

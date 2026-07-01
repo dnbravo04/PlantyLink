@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/haptics.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
 import '../../../app.dart';
@@ -141,6 +143,7 @@ class _Esp32VinculacionScreenState
     try {
       await ref.read(deviceServiceProvider).vincularESP32(deviceId);
       if (mounted) {
+        AppHaptics.medium();
         setState(() {
           _exitoso   = true;
           _esp32Id   = deviceId;
@@ -494,23 +497,64 @@ class _Esp32VinculacionScreenState
           width: 96, height: 96,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: c.primary.withValues(alpha: 0.12),
-            border: Border.all(color: c.primary.withValues(alpha: 0.4), width: 2),
+            color: c.warning.withValues(alpha: 0.12),
+            border: Border.all(color: c.warning.withValues(alpha: 0.4), width: 2),
           ),
-          child: Icon(Icons.link_rounded, size: 48, color: c.primary),
+          child: Icon(Icons.nfc_rounded, size: 48, color: c.warning),
         ),
         const SizedBox(height: 24),
         Text(
-          'Vincula tu ESP32',
+          'NFC no disponible',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 20, fontWeight: FontWeight.w800, color: c.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'NFC no disponible. Usa una de las\nopciones alternativas para vincular.',
+          'Activa NFC en los ajustes de tu teléfono\no usa las opciones alternativas.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: c.textMuted, height: 1.5),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () async {
+            AppHaptics.light();
+            // Open Android NFC settings
+            const channel = MethodChannel('com.plantylink.app/settings');
+            try {
+              await channel.invokeMethod('openNfcSettings');
+            } catch (_) {
+              // Fallback: open general wireless settings
+              try {
+                await channel.invokeMethod('openWirelessSettings');
+              } catch (_) {}
+            }
+          },
+          icon: const Icon(Icons.settings_rounded, size: 16),
+          label: const Text('Abrir ajustes NFC', style: TextStyle(fontSize: 13)),
+          style: FilledButton.styleFrom(
+            backgroundColor: c.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () async {
+            AppHaptics.light();
+            _checkNfcAvailability();
+          },
+          icon: Icon(Icons.refresh_rounded, size: 16, color: c.primary),
+          label: Text('Verificar NFC de nuevo',
+              style: TextStyle(color: c.primary, fontSize: 13)),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: c.primary.withValues(alpha: 0.4)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       ],
     );
