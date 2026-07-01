@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
+import '../../core/theme/app_tokens.dart';
+import '../../core/utils/app_page_route.dart';
+import '../../core/utils/haptics.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
+import '../widgets/common/animated_app_card.dart';
 import 'settings/profile_settings_screen.dart';
 import 'settings/crop_settings_screen.dart';
 import 'settings/preferences_screen.dart';
@@ -32,54 +36,78 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           _buildUserHeader(userAsync, c),
           const SizedBox(height: 20),
-          _buildNavTile(
-            icon: Icons.person_outline_rounded,
-            color: c.info,
-            title: 'Perfil y cuenta',
-            subtitle: 'Nombre, ciudad, contraseña',
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ProfileSettingsScreen())),
-            c: c,
-          ),
-          const SizedBox(height: 8),
-          _buildNavTile(
-            icon: Icons.eco_rounded,
-            color: c.success,
-            title: 'Mi cultivo',
-            subtitle: profileAsync.when(
-              data: (p) => p?.nombre ?? 'Sin configurar',
-              loading: () => 'Cargando...',
-              error: (_, _) => 'Error',
+          AnimatedAppCard(
+            delay: 0,
+            child: _buildNavTile(
+              icon: Icons.person_outline_rounded,
+              color: c.info,
+              title: 'Perfil y cuenta',
+              subtitle: 'Nombre, ciudad, contraseña',
+              onTap: () {
+                AppHaptics.light();
+                Navigator.push(context,
+                    AppPageRoute(builder: (_) => const ProfileSettingsScreen()));
+              },
+              c: c,
             ),
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CropSettingsScreen())),
-            c: c,
           ),
           const SizedBox(height: 8),
-          _buildNavTile(
-            icon: Icons.palette_outlined,
-            color: c.accent,
-            title: 'Preferencias',
-            subtitle: 'Tema, sensores, notificaciones',
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PreferencesScreen())),
-            c: c,
-          ),
-          const SizedBox(height: 8),
-          _buildNavTile(
-            icon: Icons.memory_rounded,
-            color: _deviceColor(sensorAsync, c),
-            title: 'Mi dispositivo',
-            subtitle: sensorAsync.when(
-              data: (s) => (s.conectado ?? false)
-                  ? 'ESP32 conectado'
-                  : 'ESP32 desconectado',
-              loading: () => 'Verificando...',
-              error: (_, _) => 'Error de conexión',
+          AnimatedAppCard(
+            delay: 80,
+            child: _buildNavTile(
+              icon: Icons.eco_rounded,
+              color: c.success,
+              title: 'Mi cultivo',
+              subtitle: profileAsync.when(
+                data: (p) => p?.nombre ?? 'Sin configurar',
+                loading: () => 'Cargando...',
+                error: (_, _) => 'Error',
+              ),
+              onTap: () {
+                AppHaptics.light();
+                Navigator.push(context,
+                    AppPageRoute(builder: (_) => const CropSettingsScreen()));
+              },
+              c: c,
             ),
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const DeviceScreen())),
-            c: c,
+          ),
+          const SizedBox(height: 8),
+          AnimatedAppCard(
+            delay: 160,
+            child: _buildNavTile(
+              icon: Icons.palette_outlined,
+              color: c.accent,
+              title: 'Preferencias',
+              subtitle: 'Tema, sensores, notificaciones',
+              onTap: () {
+                AppHaptics.light();
+                Navigator.push(context,
+                    AppPageRoute(builder: (_) => const PreferencesScreen()));
+              },
+              c: c,
+            ),
+          ),
+          const SizedBox(height: 8),
+          AnimatedAppCard(
+            delay: 240,
+            child: _buildNavTile(
+              icon: Icons.memory_rounded,
+              color: _deviceColor(sensorAsync, c),
+              title: 'Mi dispositivo',
+              subtitle: sensorAsync.when(
+                data: (s) => (s.conectado ?? false)
+                    ? 'ESP32 conectado'
+                    : 'ESP32 desconectado',
+                loading: () => 'Verificando...',
+                error: (_, _) => 'Error de conexión',
+              ),
+              onTap: () {
+                AppHaptics.light();
+                Navigator.push(context,
+                    AppPageRoute(builder: (_) => const DeviceScreen()));
+              },
+              c: c,
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -168,32 +196,25 @@ class SettingsScreen extends ConsumerWidget {
     required VoidCallback onTap,
     required AppColorScheme c,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: c.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: c.cardBorder),
-      ),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: color, size: 22),
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTokens.radiusLg)),
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
         ),
-        title: Text(title,
-            style: TextStyle(
-                color: c.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle,
-            style: TextStyle(color: c.textMuted, fontSize: 12)),
-        trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
-        onTap: onTap,
+        child: Icon(icon, color: color, size: 22),
       ),
+      title: Text(title,
+          style: TextStyle(
+              color: c.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle,
+          style: TextStyle(color: c.textMuted, fontSize: 12)),
+      trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+      onTap: onTap,
     );
   }
 }

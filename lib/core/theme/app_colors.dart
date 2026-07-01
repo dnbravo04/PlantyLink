@@ -26,12 +26,12 @@ sealed class AppColors {
   static const Color textMuted     = Color(0xFF5B8A72); // Raised from 0x2D5944 for WCAG 4.5:1
   static const Color textDisabled  = Color(0xFF3D5C4A); // Raised from 0x1E3A2C for visibility
 
-  // ── Full dark scheme ──────────────────────────────────────────────────────
+  // ── Full dark scheme (warm grays) ─────────────────────────────────────────
   static const AppColorScheme dark = AppColorScheme(
     brightness:     Brightness.dark,
-    background:     Color(0xFF07110E),
-    cardBackground: Color(0xFF0F1F18),
-    cardBorder:     Color(0xFF1E3A2C),
+    background:     Color(0xFF0C0F0E), // Warmer dark background
+    cardBackground: Color(0xFF141A17), // Slightly warmer card
+    cardBorder:     Color(0xFF243830), // More visible borders
     primary:        Color(0xFF10B981),
     success:        Color(0xFF34D399),
     warning:        Color(0xFFF59E0B),
@@ -44,22 +44,22 @@ sealed class AppColors {
     textDisabled:   Color(0xFF3D5C4A), // Visible but clearly disabled
   );
 
-  // ── Full light scheme ─────────────────────────────────────────────────────
+  // ── Full light scheme (warm palette) ────────────────────────────────────
   static const AppColorScheme light = AppColorScheme(
     brightness:     Brightness.light,
-    background:     Color(0xFFF0FDF4),
+    background:     Color(0xFFFAFAF5), // Warm cream instead of mint green
     cardBackground: Color(0xFFFFFFFF),
-    cardBorder:     Color(0xFFBBF7D0),
+    cardBorder:     Color(0xFFE8E5DC), // Warm beige instead of green
     primary:        Color(0xFF059669),
     success:        Color(0xFF10B981),
     warning:        Color(0xFFD97706),
     error:          Color(0xFFDC2626),
     info:           Color(0xFF0284C7), // Sky-600 — distinct blue for information
-    accent:         Color(0xFF047857), // Emerald-700 — darker complement to primary
-    textPrimary:    Color(0xFF022C22),
-    textSecondary:  Color(0xFF065F46),
-    textMuted:      Color(0xFF6B7280),
-    textDisabled:   Color(0xFF9CA3AF), // Gray-400 — visible on white/light-green backgrounds
+    accent:         Color(0xFFF97316), // Warm orange for secondary CTAs
+    textPrimary:    Color(0xFF1A1A1A), // Neutral dark instead of teal
+    textSecondary:  Color(0xFF4B5563), // Gray-600 for readability
+    textMuted:      Color(0xFF9CA3AF), // Gray-400
+    textDisabled:   Color(0xFFD1D5DB), // Gray-300
   );
 
   /// Returns the scheme matching the current [BuildContext] brightness.

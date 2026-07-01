@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +13,7 @@ import '../../models/sensor_data.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/shimmer_placeholder.dart';
 
 enum _TimeRange {
   h1('1h', Duration(hours: 1)),
@@ -86,11 +89,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         ],
       ),
       body: historyAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 3,
-            valueColor: AlwaysStoppedAnimation<Color>(c.primary),
-          ),
+        loading: () => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(children: [
+            const ShimmerPlaceholder.card(height: 40),
+            const SizedBox(height: 16),
+            const ShimmerPlaceholder.card(height: 220),
+            const SizedBox(height: 20),
+            const ShimmerPlaceholder.card(height: 220),
+          ]),
         ),
         error: (error, _) => Center(
           child: Text(
@@ -104,11 +111,24 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.history, size: 64, color: c.textMuted),
-                  const SizedBox(height: 16),
+                  Container(
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: c.info.withValues(alpha: 0.08),
+                    ),
+                    child: Icon(Icons.show_chart_rounded, size: 48,
+                        color: c.info.withValues(alpha: 0.4)),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('Aún no hay lecturas',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                  const SizedBox(height: 8),
                   Text(
-                    'No hay datos de historial',
-                    style: TextStyle(color: c.textMuted, fontSize: 16),
+                    'Los datos de tus sensores aparecerán\naquí cuando comiencen a registrarse.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: c.textMuted, height: 1.5),
                   ),
                 ],
               ),
@@ -117,7 +137,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
           final filtered = _filterByRange(history);
 
-          return SingleChildScrollView(
+          return RefreshIndicator(
+            color: c.primary,
+            backgroundColor: c.cardBackground,
+            onRefresh: () async {
+              HapticFeedback.mediumImpact();
+              ref.invalidate(historyStreamProvider);
+              await Future.delayed(const Duration(milliseconds: 600));
+            },
+            child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -161,6 +190,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ],
               ],
             ),
+          ),
           );
         },
       ),

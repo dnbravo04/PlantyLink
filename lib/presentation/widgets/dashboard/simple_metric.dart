@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/sensor_data.dart';
 import '../../../models/plant_profile.dart';
@@ -53,7 +54,11 @@ class SimpleMetric extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value!,
-              style: TextStyle(fontSize: 12, color: c.textSecondary),
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: c.textSecondary,
+              ),
             ),
           ],
         ],

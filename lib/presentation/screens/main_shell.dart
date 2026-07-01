@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/utils/haptics.dart';
 import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/trend_alert_provider.dart';
@@ -7,22 +8,37 @@ import 'dashboard_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
-/// Main app shell with bottom navigation bar.
+/// Main app shell with bottom navigation bar and animated tab transitions.
 /// 3 tabs: Monitor, Historial, Sistema.
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
+  @override
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
   static const _screens = [
     DashboardScreen(),
     HistoryScreen(),
     SettingsScreen(),
   ];
 
+  int _previousIndex = 0;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final selectedIndex = ref.watch(selectedTabIndexProvider);
     final hasActiveAlerts = ref.watch(trendAlertProvider).alerts.isNotEmpty;
     final isOnline = ref.watch(connectivityProvider).value ?? true;
+
+    // Determine slide direction based on tab index change
+    final goingRight = selectedIndex >= _previousIndex;
+
+    // Update previous index after building
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _previousIndex = selectedIndex;
+    });
 
     return Scaffold(
       body: Column(
@@ -34,9 +50,27 @@ class MainShell extends ConsumerWidget {
                 : _OfflineBanner(key: const ValueKey('offline')),
           ),
           Expanded(
-            child: IndexedStack(
-              index: selectedIndex,
-              children: _screens,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) {
+                final offsetTween = Tween<Offset>(
+                  begin: Offset(goingRight ? 0.05 : -0.05, 0),
+                  end: Offset.zero,
+                );
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: offsetTween.animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey(selectedIndex),
+                child: _screens[selectedIndex],
+              ),
             ),
           ),
         ],
@@ -44,6 +78,7 @@ class MainShell extends ConsumerWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (index) {
+          AppHaptics.selection();
           ref.read(selectedTabIndexProvider.notifier).select(index);
         },
         destinations: [
