@@ -20,6 +20,8 @@ class DemoDataService {
       StreamController<List<Map<String, dynamic>>>.broadcast();
   // Emits whenever the active plant changes.
   final _plantController = StreamController<PlantProfile>.broadcast();
+  // Emits whenever the crop's planting date changes.
+  final _plantingDateController = StreamController<DateTime>.broadcast();
 
   // ── Timers ───────────────────────────────────────────────────────────────
   Timer? _simulationTimer;
@@ -50,6 +52,10 @@ class DemoDataService {
   int _activePlantIndex = 0;
   PlantProfile get activePlant => availablePlants[_activePlantIndex];
 
+  // Planting date — kept in memory only. Defaults to ~30 days ago so the demo
+  // starts in the vegetative stage with meaningful recommendations.
+  DateTime _plantingDate = DateTime.now().subtract(const Duration(days: 30));
+
   DemoDataService._internal();
 
   // ── Public streams ───────────────────────────────────────────────────────
@@ -71,6 +77,21 @@ class DemoDataService {
     return Stream.multi((controller) {
       controller.add(current);
       final sub = _plantController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
+  }
+
+  /// Emits the crop's planting date, delivering the current value immediately
+  /// to new subscribers (same pattern as [activePlantStream]).
+  Stream<DateTime> get plantingDateStream {
+    final current = _plantingDate;
+    return Stream.multi((controller) {
+      controller.add(current);
+      final sub = _plantingDateController.stream.listen(
         controller.add,
         onError: controller.addError,
         onDone: controller.close,
@@ -118,6 +139,7 @@ class DemoDataService {
     _sensorController.close();
     _historyController.close();
     _plantController.close();
+    _plantingDateController.close();
   }
 
   // ── Plant management (in-memory only) ────────────────────────────────────
@@ -132,6 +154,15 @@ class DemoDataService {
     }
     // Emit a fresh snapshot so listeners reflect the new profile immediately.
     _emitSensorSnapshot();
+  }
+
+  /// Updates the crop's planting date. Has no effect on Firebase.
+  void setPlantingDate(DateTime date) {
+    _plantingDate = date;
+    debugPrint('🌱 DemoDataService: fecha de siembra → $date');
+    if (!_plantingDateController.isClosed) {
+      _plantingDateController.add(date);
+    }
   }
 
   // ── Pump toggle (in-memory only) ─────────────────────────────────────────
