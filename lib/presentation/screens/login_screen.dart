@@ -104,6 +104,9 @@ class _LoginScreenState extends State<LoginScreen>
       phoneNumber: formatPhoneNumber(phone),
       verificationCompleted: (PhoneAuthCredential cred) async {
         await FirebaseAuth.instance.signInWithCredential(cred);
+        // Dismiss the OTP screen if it was already pushed; AuthGate
+        // takes over routing once the auth state changes.
+        if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() { _error = _mapAuthError(e.code); _cargando = false; });

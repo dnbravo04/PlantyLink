@@ -282,6 +282,12 @@ class _ChartCard extends StatelessWidget {
         ? (history.length / 5).floorToDouble().clamp(1.0, double.infinity)
         : 1.0;
 
+    // Show the date alongside the time when the visible range spans
+    // more than a day (7d / "Todo"), where HH:mm alone is ambiguous.
+    final showDate = history.last.timestamp
+            .difference(history.first.timestamp) >
+        const Duration(hours: 23);
+
     final gridColor = c.cardBorder.withValues(alpha: 0.5);
     final limitLineColor = c.textMuted.withValues(alpha: 0.5);
 
@@ -302,11 +308,44 @@ class _ChartCard extends StatelessWidget {
           SizedBox(
             height: 220,
             child: LineChart(
+              transformationConfig: const FlTransformationConfig(
+                scaleAxis: FlScaleAxis.horizontal,
+                minScale: 1,
+                maxScale: 10,
+              ),
               LineChartData(
                 minX: 0,
                 maxX: (history.length - 1).toDouble(),
                 minY: adjustedMinY,
                 maxY: adjustedMaxY,
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (_) => c.cardBackground,
+                    tooltipBorder: BorderSide(color: c.cardBorder),
+                    getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                      final i = spot.x.round().clamp(0, history.length - 1);
+                      final time = history[i].timestamp;
+                      return LineTooltipItem(
+                        '${DateFormat('dd/MM HH:mm').format(time)}\n',
+                        TextStyle(
+                          color: c.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: spot.y.toStringAsFixed(2),
+                            style: TextStyle(
+                              color: lineColor,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
@@ -319,7 +358,7 @@ class _ChartCard extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 30,
+                      reservedSize: showDate ? 42 : 30,
                       interval: xInterval,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
@@ -330,10 +369,14 @@ class _ChartCard extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            DateFormat('HH:mm').format(time),
+                            showDate
+                                ? '${DateFormat('dd/MM').format(time)}\n${DateFormat('HH:mm').format(time)}'
+                                : DateFormat('HH:mm').format(time),
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               color: c.textMuted,
                               fontSize: 10,
+                              height: 1.3,
                             ),
                           ),
                         );
