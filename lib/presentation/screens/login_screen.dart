@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/phone_utils.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
+import '../widgets/common/brand_mark.dart';
 import '../../app.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -207,40 +208,8 @@ class _LoginScreenState extends State<LoginScreen>
       opacity: _logoFade,
       child: Column(
         children: [
-          Container(
-            width: 72, height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [c.primary, c.success],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: c.primary.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.energy_savings_leaf_rounded,
-              size: 36,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'PlantyLink',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: c.textPrimary,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const BrandMark(logoSize: 84, wordmarkWidth: 210, spacing: 14),
+          const SizedBox(height: 12),
           Text(
             'Conecta y cuida tu cultivo',
             style: GoogleFonts.plusJakartaSans(
