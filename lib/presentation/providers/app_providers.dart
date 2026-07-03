@@ -15,6 +15,7 @@ import '../../domain/repositories/sensor_repository.dart';
 import '../../domain/repositories/plant_repository.dart';
 import '../../data/repositories/sensor_repository_impl.dart';
 import '../../data/repositories/plant_repository_impl.dart';
+import '../../models/linked_device.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/pump_schedule.dart';
@@ -80,6 +81,19 @@ final scheduleServiceProvider = Provider<ScheduleService?>((ref) {
 
 final deviceServiceProvider = Provider<DeviceService>((ref) {
   return DeviceService();
+});
+
+/// Stream of the user's registered ESP32 devices (multi-device support).
+/// The active one is whichever matches [deviceContextProvider]'s esp32Id.
+final linkedDevicesProvider = StreamProvider<List<LinkedDevice>>((ref) {
+  if (kDemoMode) {
+    return Stream.value(const [
+      LinkedDevice(id: 'ESP32-DEMO', nombre: 'PlantyLink Demo'),
+    ]);
+  }
+  // Re-subscribe on sign-in/sign-out so the stream follows the current user.
+  ref.watch(deviceContextProvider);
+  return ref.watch(deviceServiceProvider).linkedDevicesStream;
 });
 
 final authServiceProvider = Provider<AuthService>((ref) {

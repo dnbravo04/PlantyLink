@@ -265,11 +265,40 @@ class _ChartCard extends StatelessWidget {
       return FlSpot(i.toDouble(), valueExtractor(history[i]));
     });
 
-    if (spots.isEmpty) return const SizedBox.shrink();
+    if (spots.length < 2) {
+      // A line needs at least two points; minX == maxX breaks fl_chart.
+      return AppCard(
+        margin: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: Center(
+                child: Text(
+                  'Se necesitan más lecturas en este rango para graficar',
+                  style: TextStyle(color: c.textMuted, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
-    final padding = (maxY - minY) * 0.2;
+    // Flat series (all readings equal) would collapse the Y range to zero.
+    final padding = maxY > minY ? (maxY - minY) * 0.2 : maxY.abs() * 0.1 + 0.5;
     final bottom = minY - padding;
     final top = maxY + padding;
 
