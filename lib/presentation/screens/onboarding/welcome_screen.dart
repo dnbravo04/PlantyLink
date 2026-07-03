@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/utils/haptics.dart';
+import '../../widgets/common/brand_mark.dart';
 import '../../../app.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -107,23 +108,32 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // Skip button
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 12, 20, 0),
-                  child: TextButton(
-                    onPressed: _skip,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.7),
+              // Brand mark + skip button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 8, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const BrandMark(
+                      logoSize: 30,
+                      wordmarkWidth: 118,
+                      spacing: 8,
+                      horizontal: true,
+                      onDarkSurface: true,
                     ),
-                    child: Text(
-                      'Saltar',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14, fontWeight: FontWeight.w500,
+                    TextButton(
+                      onPressed: _skip,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      child: Text(
+                        'Saltar',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14, fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
 

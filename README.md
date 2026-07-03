@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/plantylink_full.png" alt="PlantyLink" width="440">
+</p>
+
 # PlantyLink 🌱
 
 Hydroponic monitoring app that bridges hardware and software: pairs with an ESP32 sensor device over NFC, streams real-time data (pH, temperature, EC, tank levels) through Firebase, and enriches each plant's profile with care data from an external plant catalog API.
