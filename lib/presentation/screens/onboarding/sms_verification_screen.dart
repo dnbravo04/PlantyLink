@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/phone_utils.dart';
@@ -24,6 +25,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
   String? _error;
   String _verificationId = '';
   String _phoneNumber = '';
+  bool _isLogin = false;
 
   late AnimationController _entryAnim;
   late Animation<double> _fade;
@@ -44,11 +46,23 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, String>?;
+    final args = ModalRoute.of(context)?.settings.arguments as Map?;
     if (args != null) {
-      _verificationId = args['verificationId'] ?? '';
-      _phoneNumber = args['phoneNumber'] ?? '';
+      _verificationId = args['verificationId'] as String? ?? '';
+      _phoneNumber = args['phoneNumber'] as String? ?? '';
+      _isLogin = args['isLogin'] == true;
+    }
+  }
+
+  /// Login flow: pop back to AuthGate, which routes by auth state.
+  /// Registration flow: AuthGate was replaced by the registration route,
+  /// so continue explicitly to profile creation.
+  void _navigateAfterSignIn() {
+    if (!mounted) return;
+    if (_isLogin) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    } else {
+      Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
     }
   }
 
@@ -70,9 +84,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
         smsCode: code,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
-      }
+      _navigateAfterSignIn();
     } on FirebaseAuthException catch (e) {
       setState(() {
         _error = switch (e.code) {
@@ -95,9 +107,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
         phoneNumber: formatPhoneNumber(_phoneNumber),
         verificationCompleted: (PhoneAuthCredential credential) async {
           await FirebaseAuth.instance.signInWithCredential(credential);
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, AppRoutes.onboardingPerfil);
-          }
+          _navigateAfterSignIn();
         },
         verificationFailed: (FirebaseAuthException e) {
           setState(() {
@@ -355,6 +365,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
         controller: _digitControllers[index],
         focusNode: _focusNodes[index],
         keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         textAlign: TextAlign.center,
         maxLength: 1,
         style: GoogleFonts.plusJakartaSans(

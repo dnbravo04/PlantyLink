@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../firebase_constants.dart';
 
 /// Top-level FCM background handler — must be a bare function (not a closure).
 @pragma('vm:entry-point')
@@ -27,6 +31,7 @@ class NotificationService {
   final _local = FlutterLocalNotificationsPlugin();
   StreamSubscription<RemoteMessage>? _onMessageSub;
   StreamSubscription<String>? _onTokenRefreshSub;
+  StreamSubscription<User?>? _onAuthSub;
 
   static const _channelId = 'plantylink_alerts';
   static const _channelName = 'Alertas PlantyLink';
@@ -92,17 +97,37 @@ class NotificationService {
       );
     });
 
-    // ── FCM token (useful for server-side targeting) ───────────────────────
-    _fcm.getToken().then((token) => debugPrint('[FCM] token: $token'));
-    _onTokenRefreshSub = _fcm.onTokenRefresh.listen(
-      (token) => debugPrint('[FCM] token refreshed: $token'),
-    );
+    // ── FCM token → RTDB, so Cloud Functions can target this device ────────
+    _onAuthSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) _syncTokenForUser(user.uid);
+    });
+    _onTokenRefreshSub = _fcm.onTokenRefresh.listen((token) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) _writeToken(uid, token);
+    });
+  }
+
+  Future<void> _syncTokenForUser(String uid) async {
+    try {
+      final token = await _fcm.getToken();
+      if (token != null) await _writeToken(uid, token);
+    } catch (e) {
+      debugPrint('[FCM] token sync failed: $e');
+    }
+  }
+
+  Future<void> _writeToken(String uid, String token) {
+    return FirebaseDatabase.instanceFor(
+      app: Firebase.app(),
+      databaseURL: kFirebaseDatabaseUrl,
+    ).ref('usuarios/$uid/fcm_token').set(token);
   }
 
   /// Cancel active subscriptions. Called if the service is ever torn down.
   void dispose() {
     _onMessageSub?.cancel();
     _onTokenRefreshSub?.cancel();
+    _onAuthSub?.cancel();
   }
 
   /// Shows a local notification for a trend alert detected in-app.
