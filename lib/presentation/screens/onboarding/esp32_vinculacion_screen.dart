@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/utils/haptics.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/common/app_toast.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
 import '../../../app.dart';
 
@@ -247,10 +248,10 @@ class _Esp32VinculacionScreenState
                   final text = ctrl.text.trim();
                   if (text.isEmpty) return;
                   if (!_isValidDeviceId(text)) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: const Text('ID inválido. Solo letras, números, ":", "-" o "_" (3-64 caracteres).'),
-                      backgroundColor: AppColors.of(ctx).error,
-                    ));
+                    AppToast.show(ctx,
+                        message:
+                            'ID inválido. Solo letras, números, ":", "-" o "_" (3-64 caracteres).',
+                        type: ToastType.error);
                     return;
                   }
                   Navigator.pop(ctx, text);
