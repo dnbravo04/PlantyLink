@@ -5,29 +5,30 @@
     ".write": false,
 
     // ── Device-scoped data ──────────────────────────────────────────────────
-    // Access granted only to authenticated users whose linked esp32_id
-    // matches the device node they're trying to read/write.
+    // Access granted to authenticated users whose ACTIVE device (esp32_id)
+    // matches, or who have the device registered in their multi-device list
+    // (usuarios/{uid}/dispositivos/{esp32Id}).
+    // Note: Cloud Functions (Admin SDK) bypass these rules, and the future
+    // ESP32 firmware will need its own auth strategy to write sensor data.
     "devices": {
       "$esp32Id": {
-        ".read":  "auth != null && root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id",
-        ".write": "auth != null && root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id",
-
-        "sensors":     { ".validate": true },
-        "history":     { ".validate": true },
-        "controls":    { ".validate": true },
-        "schedules":   { ".validate": true },
-        "profile":     { ".validate": true },
-        "calibration": { ".validate": true },
-        "alerts":      { ".validate": true },
-        "nfc_logs":    { ".validate": true }
+        ".read":  "auth != null && (root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id || root.child('usuarios').child(auth.uid).child('dispositivos').child($esp32Id).exists())",
+        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id || root.child('usuarios').child(auth.uid).child('dispositivos').child($esp32Id).exists())"
       }
     },
 
     // ── Per-user data: readable/writable only by the owner ───────────────────
+    // .indexOn: the sensorAlerts Cloud Function queries usuarios by esp32_id.
     "usuarios": {
+      ".indexOn": ["esp32_id"],
       "$uid": {
         ".read":  "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+
+        // Profile photo: compressed base64 JPEG written by the app (≤ ~110 KB)
+        "foto_b64": {
+          ".validate": "newData.isString() && newData.val().length < 150000"
+        }
       }
     },
 
