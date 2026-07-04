@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/app_toast.dart';
 import '../widgets/common/demo_mode_banner.dart';
 
 // CalibrationService provider is now centralized in app_providers.dart
@@ -41,7 +42,8 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
           );
       _snack('Punto pH ${buffer.toStringAsFixed(1)} guardado (sensor: ${reading.toStringAsFixed(2)})');
     } catch (e) {
-      _snack('Error al guardar calibración: $e', error: true);
+      _snack('No se pudo guardar la calibración. Intenta de nuevo.',
+          error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -61,7 +63,8 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
           );
       _snack('EC calibrado (${reading.toStringAsFixed(2)} → ${knownEc.toStringAsFixed(2)} mS/cm)');
     } catch (e) {
-      _snack('Error al guardar calibración: $e', error: true);
+      _snack('No se pudo guardar la calibración. Intenta de nuevo.',
+          error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -93,11 +96,8 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
 
   void _snack(String msg, {bool error = false}) {
     if (!mounted) return;
-    final c = AppColors.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? c.error : c.success,
-    ));
+    AppToast.show(context,
+        message: msg, type: error ? ToastType.error : ToastType.success);
   }
 
   // ── EC custom value dialog ─────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import '../../../models/plant_profile.dart';
 import '../../providers/app_providers.dart';
 import '../plant_selector_screen.dart';
 import '../../widgets/common/app_scaffold.dart';
+import '../../widgets/common/app_toast.dart';
 
 /// Active crop and threshold configuration screen.
 class CropSettingsScreen extends ConsumerStatefulWidget {
@@ -233,13 +234,15 @@ class _CropSettingsScreenState extends ConsumerState<CropSettingsScreen> {
                         'ec_max': _ecMax,
                       });
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Umbrales guardados')));
+                        AppToast.show(context,
+                            message: 'Umbrales guardados',
+                            type: ToastType.success);
                       }
                     } catch (_) {
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('Error al guardar umbrales')));
+                        AppToast.show(context,
+                            message: 'Error al guardar umbrales',
+                            type: ToastType.error);
                       }
                     }
                   },

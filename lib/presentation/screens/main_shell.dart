@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/utils/haptics.dart';
 import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
@@ -122,7 +123,7 @@ class _OfflineBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.orange.shade800,
+      color: AppColors.of(context).warning,
       child: const SafeArea(
         bottom: false,
         child: Padding(

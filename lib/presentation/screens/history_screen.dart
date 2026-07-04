@@ -102,7 +102,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         ),
         error: (error, _) => Center(
           child: Text(
-            'Error: $error',
+            'No se pudo cargar el historial.\nDesliza hacia abajo para reintentar.',
+            textAlign: TextAlign.center,
             style: TextStyle(color: c.textSecondary),
           ),
         ),

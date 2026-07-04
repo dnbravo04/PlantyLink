@@ -5,6 +5,7 @@ import '../../../core/theme/app_color_scheme.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/common/app_scaffold.dart';
+import '../../widgets/common/app_toast.dart';
 
 /// Preferences: theme, visualization mode, active sensors, notifications.
 class PreferencesScreen extends ConsumerStatefulWidget {
@@ -28,8 +29,8 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           ?.updateUserSettings({'sensores_activos': _activeSensors});
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al guardar sensores')));
+        AppToast.show(context,
+            message: 'Error al guardar sensores', type: ToastType.error);
       }
     }
   }
@@ -50,8 +51,8 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
       await ref.read(userServiceProvider)?.setAlertsEnabled(enabled);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al cambiar alertas')));
+        AppToast.show(context,
+            message: 'Error al cambiar alertas', type: ToastType.error);
       }
     }
   }
