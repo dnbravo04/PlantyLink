@@ -8,6 +8,7 @@ import '../../core/services/control_service.dart';
 import '../../core/services/history_service.dart';
 import '../../core/services/profile_service.dart';
 import '../../core/services/device_service.dart';
+import '../../core/services/user_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/calibration_service.dart';
 import '../../core/services/schedule_service.dart';
@@ -100,6 +101,14 @@ final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
 });
 
+/// User-account operations at `usuarios/{uid}`. Unlike the device-scoped
+/// services this is always available — profile edits and preferences must
+/// work before any ESP32 is linked. Null only in demo mode (no writes).
+final userServiceProvider = Provider<UserService?>((ref) {
+  if (kDemoMode) return null;
+  return UserService();
+});
+
 // ── Repositories ─────────────────────────────────────────────────────────────
 
 final sensorRepositoryProvider = Provider<SensorRepository?>((ref) {
@@ -180,30 +189,43 @@ final plantingDateProvider = StreamProvider<DateTime?>((ref) {
   return repo.plantingDateStream;
 });
 
-/// Stream of the current user's Firestore profile.
+/// Stream of the current user's profile at `usuarios/{uid}`.
 /// Returns an empty stream in demo mode (no auth required).
 final userProfileProvider = StreamProvider<Map<String, dynamic>>((ref) {
-  if (kDemoMode) return Stream.value({});
-  final service = ref.watch(profileServiceProvider);
+  final service = ref.watch(userServiceProvider);
   if (service == null) return Stream.value({});
   return service.userProfileStream;
 });
 
 /// Stream of whether system alerts are enabled.
 final alertsEnabledProvider = StreamProvider<bool>((ref) {
-  if (kDemoMode) return Stream.value(true);
-  final service = ref.watch(profileServiceProvider);
+  final service = ref.watch(userServiceProvider);
   if (service == null) return Stream.value(true);
   return service.alertsEnabledStream;
 });
 
-/// The user's preferred visualization mode — derived from [userProfileProvider]
-/// so there is no separate Firebase listener.
-final visualizationModeProvider = Provider<String>((ref) {
-  return ref.watch(userProfileProvider).value?['modo_visualizacion']
-          as String? ??
-      'tecnica';
-});
+class VisualizationModeNotifier extends Notifier<String> {
+  @override
+  String build() {
+    // Follows the stored preference. set() takes effect immediately; outside
+    // demo mode the stored value catches up once the RTDB write lands.
+    return ref.watch(userProfileProvider).value?['modo_visualizacion']
+            as String? ??
+        'tecnica';
+  }
+
+  void set(String mode) {
+    state = mode;
+    ref.read(userServiceProvider)?.updateUserSettings(
+        {'modo_visualizacion': mode});
+  }
+}
+
+/// The user's preferred visualization mode. Local-first so the dashboard
+/// toggle also works in demo mode, where nothing is persisted.
+final visualizationModeProvider =
+    NotifierProvider<VisualizationModeNotifier, String>(
+        VisualizationModeNotifier.new);
 
 /// True when the device has any active network connection.
 final connectivityProvider = StreamProvider<bool>((ref) {

@@ -16,6 +16,8 @@ import '../providers/trend_alert_provider.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/animated_app_card.dart';
 import '../widgets/common/shimmer_placeholder.dart';
+import '../widgets/common/user_avatar.dart';
+import '../widgets/dashboard/illuminated_button.dart';
 import '../widgets/dashboard/simple_metric.dart';
 import '../widgets/dashboard/sensor_card.dart';
 
@@ -117,6 +119,8 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               _buildMetrics(sensorAsync, profileAsync, visualizationMode, c),
               const SizedBox(height: 8),
+              _buildActuators(sensorAsync, ref, c),
+              const SizedBox(height: 8),
               _buildAlert(sensorAsync, profileAsync, c),
               const SizedBox(height: 8),
               _buildTrendAlerts(ref, c),
@@ -154,29 +158,9 @@ class DashboardScreen extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Avatar
-        if (userName != null && userName.isNotEmpty) ...[
-          Container(
-            width: 42, height: 42,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [c.primary, c.accent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                userName[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
+        // Avatar (photo → Google picture → initial)
+        UserAvatar(user: userAsync.value ?? const {}, size: 42, radius: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,6 +359,105 @@ class DashboardScreen extends ConsumerWidget {
 
   // ── Alerts ──────────────────────────────────────────────────────────────
 
+  // ── Actuator controls ───────────────────────────────────────────────────
+
+  Widget _buildActuators(
+    AsyncValue<SensorData> sensorAsync,
+    WidgetRef ref,
+    AppColorScheme c,
+  ) {
+    final sensor = sensorAsync.value;
+    if (sensor == null) return const SizedBox.shrink();
+
+    void toggle(String pumpId, bool current) {
+      ref.read(sensorRepositoryProvider)?.togglePump(pumpId, !current);
+    }
+
+    Widget button({
+      required String label,
+      required IconData icon,
+      required Color color,
+      required String pumpId,
+      required bool? active,
+      bool? auto,
+      bool? override,
+    }) {
+      final isActive = active ?? false;
+      return Expanded(
+        child: IlluminatedButton(
+          label: label,
+          icon: icon,
+          color: color,
+          isActive: isActive,
+          isAutoMode: auto ?? false,
+          isManualOverride: override ?? false,
+          onTap: () => toggle(pumpId, isActive),
+        ),
+      );
+    }
+
+    return AnimatedAppCard(
+      delay: 400,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Actuadores',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: c.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            button(
+              label: 'Bomba agua',
+              icon: Icons.water_drop_rounded,
+              color: c.info,
+              pumpId: 'bomba_agua',
+              active: sensor.bombaAgua,
+              auto: sensor.bombaAguaAuto,
+              override: sensor.bombaAguaManualOverride,
+            ),
+            const SizedBox(width: 10),
+            button(
+              label: 'Fertilizante',
+              icon: Icons.eco_rounded,
+              color: c.success,
+              pumpId: 'bomba_fertilizante',
+              active: sensor.bombaFertilizante,
+              auto: sensor.bombaFertilizanteAuto,
+              override: sensor.bombaFertilizanteManualOverride,
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            button(
+              label: 'Dosif. ácido',
+              icon: Icons.science_rounded,
+              color: c.warning,
+              pumpId: 'bomba_dosificadora_acido',
+              active: sensor.bombaDosificadoraAcido,
+              auto: sensor.dosificadoraAcidoAuto,
+              override: sensor.dosificadoraAcidoManualOverride,
+            ),
+            const SizedBox(width: 10),
+            button(
+              label: 'Dosif. base',
+              icon: Icons.opacity_rounded,
+              color: c.accent,
+              pumpId: 'bomba_dosificadora_basico',
+              active: sensor.bombaDosificadoraBasico,
+              auto: sensor.dosificadoraBaseAuto,
+              override: sensor.dosificadoraBaseManualOverride,
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAlert(
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
@@ -570,8 +653,7 @@ class _DashboardViewToggle extends ConsumerWidget {
             c: c,
             onTap: () {
               AppHaptics.selection();
-              ref.read(profileServiceProvider)?.updateUserSettings(
-                  {'modo_visualizacion': 'tecnica'});
+              ref.read(visualizationModeProvider.notifier).set('tecnica');
             },
           ),
           _buildSegment(
@@ -581,8 +663,7 @@ class _DashboardViewToggle extends ConsumerWidget {
             c: c,
             onTap: () {
               AppHaptics.selection();
-              ref.read(profileServiceProvider)?.updateUserSettings(
-                  {'modo_visualizacion': 'sencilla'});
+              ref.read(visualizationModeProvider.notifier).set('sencilla');
             },
           ),
         ],

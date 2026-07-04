@@ -15,31 +15,16 @@ class PreferencesScreen extends ConsumerStatefulWidget {
 }
 
 class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
-  String _visualizationMode = 'tecnica';
   List<String> _activeSensors = [
     'temperatura', 'ph', 'conductividad',
     'nivel_agua_tanque', 'nivel_fertilizante_tanque',
   ];
   bool _initialized = false;
 
-  Future<void> _saveVisualizationMode(String mode) async {
-    setState(() => _visualizationMode = mode);
-    try {
-      await ref
-          .read(profileServiceProvider)
-          ?.updateUserSettings({'modo_visualizacion': mode});
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al guardar modo de visualización')));
-      }
-    }
-  }
-
   Future<void> _saveActiveSensors() async {
     try {
       await ref
-          .read(profileServiceProvider)
+          .read(userServiceProvider)
           ?.updateUserSettings({'sensores_activos': _activeSensors});
     } catch (_) {
       if (mounted) {
@@ -62,7 +47,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
 
   Future<void> _toggleAlerts(bool enabled) async {
     try {
-      await ref.read(profileServiceProvider)?.setAlertsEnabled(enabled);
+      await ref.read(userServiceProvider)?.setAlertsEnabled(enabled);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -76,20 +61,15 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
     final c = AppColors.of(context);
     final alertsAsync = ref.watch(alertsEnabledProvider);
 
-    ref.listen<AsyncValue<Map<String, dynamic>>>(userProfileProvider,
-        (_, next) {
-      next.whenData((user) {
-        if (!_initialized) {
-          final viz = user['modo_visualizacion'] as String? ?? 'tecnica';
-          final sensors = user['sensores_activos'] as List<dynamic>?;
-          setState(() {
-            _initialized = true;
-            _visualizationMode = viz;
-            if (sensors != null) _activeSensors = sensors.cast<String>();
-          });
-        }
-      });
-    });
+    // Seed local state from the profile's current value. A ref.listen would
+    // miss it: the provider is usually alive (dashboard watches it), so no
+    // new emission arrives after this screen opens.
+    final user = ref.watch(userProfileProvider).value;
+    if (!_initialized && user != null) {
+      _initialized = true;
+      final sensors = user['sensores_activos'] as List<dynamic>?;
+      if (sensors != null) _activeSensors = sensors.cast<String>();
+    }
 
     return AppScaffold(
       appBar: AppBar(
@@ -163,6 +143,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
   }
 
   Widget _buildVisualizationModeCard(AppColorScheme c) {
+    final mode = ref.watch(visualizationModeProvider);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -176,10 +157,11 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
             child: _ModeOption(
               label: 'Vista Técnica',
               icon: Icons.speed_outlined,
-              selected: _visualizationMode == 'tecnica',
+              selected: mode == 'tecnica',
               color: c.info,
               c: c,
-              onTap: () => _saveVisualizationMode('tecnica'),
+              onTap: () =>
+                  ref.read(visualizationModeProvider.notifier).set('tecnica'),
             ),
           ),
           const SizedBox(width: 8),
@@ -187,10 +169,11 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
             child: _ModeOption(
               label: 'Vista Sencilla',
               icon: Icons.visibility_outlined,
-              selected: _visualizationMode == 'sencilla',
+              selected: mode == 'sencilla',
               color: c.success,
               c: c,
-              onTap: () => _saveVisualizationMode('sencilla'),
+              onTap: () =>
+                  ref.read(visualizationModeProvider.notifier).set('sencilla'),
             ),
           ),
         ],

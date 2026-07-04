@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/firebase_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/profile_photo.dart';
 import '../../widgets/common/onboarding_step_indicator.dart';
 import '../../../app.dart';
 
@@ -22,6 +24,7 @@ class _PerfilScreenState extends State<PerfilScreen>
   final _ciudadCtrl = TextEditingController();
   bool   _cargando    = false;
   String? _error;
+  String? _fotoB64;
 
   late AnimationController _anim;
   late Animation<double>   _fade;
@@ -44,12 +47,21 @@ class _PerfilScreenState extends State<PerfilScreen>
     super.dispose();
   }
 
+  Future<void> _elegirFoto() async {
+    final action = await chooseProfilePhoto(context, canRemove: _fotoB64 != null);
+    if (action == null) return;
+    setState(() => _fotoB64 = switch (action) {
+      ProfilePhotoPicked(:final base64Jpeg) => base64Jpeg,
+      ProfilePhotoRemoved() => null,
+    });
+  }
+
   Future<void> _siguiente() async {
     final nombre = _nombreCtrl.text.trim();
     final ciudad = _ciudadCtrl.text.trim();
 
-    if (nombre.isEmpty || ciudad.isEmpty) {
-      setState(() => _error = 'Completa todos los campos');
+    if (nombre.isEmpty) {
+      setState(() => _error = 'Ingresa tu nombre');
       return;
     }
     setState(() { _cargando = true; _error = null; });
@@ -65,9 +77,12 @@ class _PerfilScreenState extends State<PerfilScreen>
     }
 
     try {
-      await db.ref('usuarios/${user.uid}').set({
+      // update(), not set(): a returning user may already have esp32_id,
+      // dispositivos, settings or fcm_token under this node.
+      await db.ref('usuarios/${user.uid}').update({
         'nombre': nombre,
-        'ciudad': ciudad,
+        if (ciudad.isNotEmpty) 'ciudad': ciudad,
+        if (_fotoB64 != null) 'foto_b64': _fotoB64,
         'creado': ServerValue.timestamp,
       });
     } catch (e) {
@@ -167,9 +182,11 @@ class _PerfilScreenState extends State<PerfilScreen>
                           OnboardingStepIndicator(currentStep: 2, colors: c),
                           const SizedBox(height: 28),
 
-                          // Avatar
+                          // Avatar — tap to add an optional profile photo
                           _AvatarPlaceholder(
                             inicial: nombre.isNotEmpty ? nombre[0].toUpperCase() : null,
+                            fotoB64: _fotoB64,
+                            onTap: _cargando ? null : _elegirFoto,
                             colors: c,
                           ),
                           const SizedBox(height: 28),
@@ -193,7 +210,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                             style: TextStyle(color: c.textPrimary, fontSize: 15),
                             textCapitalization: TextCapitalization.words,
                             decoration: const InputDecoration(
-                              labelText: 'Ciudad',
+                              labelText: 'Ciudad (opcional)',
                               prefixIcon: Icon(Icons.location_city_outlined),
                             ),
                           ),
@@ -253,52 +270,90 @@ class _PerfilScreenState extends State<PerfilScreen>
 // ── Avatar placeholder ────────────────────────────────────────────────────────
 class _AvatarPlaceholder extends StatelessWidget {
   final String? inicial;
+  final String? fotoB64;
+  final VoidCallback? onTap;
   final AppColorScheme colors;
 
-  const _AvatarPlaceholder({this.inicial, required this.colors});
+  const _AvatarPlaceholder({
+    this.inicial,
+    this.fotoB64,
+    this.onTap,
+    required this.colors,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = colors;
     return Column(
       children: [
-        Container(
-          width: 88, height: 88,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [c.primary, c.success],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: c.primary.withValues(alpha: 0.35),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
+        GestureDetector(
+          onTap: onTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 88, height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [c.primary, c.success],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: c.primary.withValues(alpha: 0.35),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: fotoB64 != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          base64Decode(fotoB64!),
+                          width: 88, height: 88,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        ),
+                      )
+                    : Center(
+                        child: inicial != null
+                            ? Text(
+                                inicial!,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_rounded,
+                                size: 44,
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                      ),
+              ),
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: c.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: c.cardBackground, width: 2),
+                  ),
+                  child: const Icon(Icons.photo_camera_rounded,
+                      size: 14, color: Colors.white),
+                ),
               ),
             ],
-          ),
-          child: Center(
-            child: inicial != null
-                ? Text(
-                    inicial!,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    Icons.person_rounded,
-                    size: 44,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Tu inicial se mostrará aquí',
+          'Toca para agregar una foto (opcional)',
           style: TextStyle(color: c.textMuted, fontSize: 11),
         ),
       ],

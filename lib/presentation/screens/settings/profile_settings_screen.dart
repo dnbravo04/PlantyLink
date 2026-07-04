@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/profile_photo.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/app_scaffold.dart';
+import '../../widgets/common/app_toast.dart';
+import '../../widgets/common/user_avatar.dart';
 import '../../../app.dart';
 
 /// User profile & account management screen.
@@ -33,7 +36,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
 
   Future<void> _saveUserProfile() async {
     try {
-      await ref.read(profileServiceProvider)?.updateUserProfile(
+      await ref.read(userServiceProvider)?.updateUserProfile(
             _nameController.text.trim(),
             _cityController.text.trim(),
           );
@@ -42,6 +45,34 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error al guardar perfil')),
         );
+      }
+    }
+  }
+
+  Future<void> _changePhoto(bool hasPhoto) async {
+    final service = ref.read(userServiceProvider);
+    if (service == null) {
+      AppToast.show(context,
+          message: 'No disponible en modo demo', type: ToastType.info);
+      return;
+    }
+    final action = await chooseProfilePhoto(context, canRemove: hasPhoto);
+    if (action == null) return;
+    try {
+      switch (action) {
+        case ProfilePhotoPicked(:final base64Jpeg):
+          await service.setUserPhoto(base64Jpeg);
+        case ProfilePhotoRemoved():
+          await service.removeUserPhoto();
+      }
+      if (mounted) {
+        AppToast.show(context,
+            message: 'Foto de perfil actualizada', type: ToastType.success);
+      }
+    } catch (_) {
+      if (mounted) {
+        AppToast.show(context,
+            message: 'Error al actualizar la foto', type: ToastType.error);
       }
     }
   }
@@ -198,7 +229,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
 
     try {
       final uid = user.uid;
-      await ref.read(profileServiceProvider)?.deleteUserData(uid);
+      await ref.read(userServiceProvider)?.deleteUserData(uid);
       await GoogleSignIn().signOut();
       await user.delete();
       if (mounted) {
@@ -262,20 +293,15 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     final c = AppColors.of(context);
     final userAsync = ref.watch(userProfileProvider);
 
-    ref.listen<AsyncValue<Map<String, dynamic>>>(userProfileProvider,
-        (_, next) {
-      next.whenData((user) {
-        if (!_initialized) {
-          _initialized = true;
-          if (!_isEditingName) {
-            _nameController.text = user['nombre']?.toString() ?? '';
-          }
-          if (!_isEditingCity) {
-            _cityController.text = user['ciudad']?.toString() ?? '';
-          }
-        }
-      });
-    });
+    // Seed the controllers from the profile's current value. A ref.listen
+    // would miss it: the provider is usually alive (dashboard watches it),
+    // so no new emission arrives after this screen opens.
+    final user = userAsync.value;
+    if (!_initialized && user != null) {
+      _initialized = true;
+      _nameController.text = user['nombre']?.toString() ?? '';
+      _cityController.text = user['ciudad']?.toString() ?? '';
+    }
 
     return AppScaffold(
       appBar: AppBar(
@@ -311,9 +337,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       AsyncValue<Map<String, dynamic>> userAsync, AppColorScheme c) {
     return userAsync.when(
       data: (user) {
-        final name = _nameController.text.isNotEmpty
-            ? _nameController.text
-            : user['nombre']?.toString() ?? '';
+        final hasPhoto = (user['foto_b64'] as String?)?.isNotEmpty == true;
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -324,26 +348,33 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           ),
           child: Column(
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      colors: [c.info, c.accent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Center(
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
-                  ),
+              // Tappable avatar with camera badge → pick/remove photo
+              GestureDetector(
+                onTap: () => _changePhoto(hasPhoto),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    UserAvatar(user: user, size: 88, radius: 26),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: c.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: c.cardBackground, width: 2),
+                        ),
+                        child: const Icon(Icons.photo_camera_rounded,
+                            size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 6),
+              Text('Toca para cambiar la foto',
+                  style: TextStyle(fontSize: 11, color: c.textMuted)),
               const SizedBox(height: 16),
               _buildEditableRow(
                   label: 'Nombre',
@@ -366,6 +397,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                     _saveUserProfile();
                   },
                   c: c),
+              const SizedBox(height: 12),
+              _buildAccountInfoRow(c),
             ],
           ),
         );
@@ -374,6 +407,57 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           Center(child: CircularProgressIndicator(strokeWidth: 2, color: c.primary)),
       error: (_, _) =>
           Text('Error al cargar perfil', style: TextStyle(color: c.textSecondary)),
+    );
+  }
+
+  /// Read-only sign-in identity: email or phone plus the auth provider.
+  Widget _buildAccountInfoRow(AppColorScheme c) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final providerIds = user.providerData.map((p) => p.providerId).toSet();
+    final (providerLabel, providerIcon) = providerIds.contains('google.com')
+        ? ('Google', Icons.g_mobiledata_rounded)
+        : providerIds.contains('phone')
+            ? ('Teléfono', Icons.phone_outlined)
+            : ('Correo', Icons.mail_outline_rounded);
+
+    final identity = user.email ?? user.phoneNumber ?? '—';
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Cuenta',
+                  style: TextStyle(fontSize: 11, color: c.textSecondary)),
+              const SizedBox(height: 2),
+              Text(identity,
+                  style: TextStyle(fontSize: 14, color: c.textPrimary)),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: c.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(providerIcon, size: 14, color: c.primary),
+              const SizedBox(width: 4),
+              Text(providerLabel,
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: c.primary)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
