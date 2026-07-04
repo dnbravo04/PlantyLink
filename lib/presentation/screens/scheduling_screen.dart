@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_color_scheme.dart';
 import '../../models/pump_schedule.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/demo_mode_banner.dart';
 
 const _actuadorLabels = {
   'bomba_agua': 'Bomba de agua',
@@ -40,7 +42,19 @@ class SchedulingScreen extends ConsumerWidget {
         onPressed: () => _showAddDialog(context, ref),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: schedulesAsync.when(
+      body: Column(
+        children: [
+          const DemoModeBanner(
+              margin: EdgeInsets.fromLTRB(20, 12, 20, 0)),
+          Expanded(child: _buildBody(schedulesAsync, context, ref, c)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(AsyncValue<List<PumpSchedule>> schedulesAsync,
+      BuildContext context, WidgetRef ref, AppColorScheme c) {
+    return schedulesAsync.when(
         loading: () =>
             Center(child: CircularProgressIndicator(color: c.primary)),
         error: (e, _) => Center(
@@ -83,9 +97,7 @@ class SchedulingScreen extends ConsumerWidget {
               );
             },
           );
-        },
-      ),
-    );
+        });
   }
 
   Future<void> _showAddDialog(BuildContext context, WidgetRef ref) async {

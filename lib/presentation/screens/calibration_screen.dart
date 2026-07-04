@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/demo_mode_banner.dart';
 
 // CalibrationService provider is now centralized in app_providers.dart
 // as `calibrationServiceProvider` with device-scoped paths.
@@ -144,14 +145,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
     final c = AppColors.of(context);
     final currentPh = _currentPh;
     final currentEc = _currentEc;
-    final calService = ref.watch(calibrationServiceProvider);
-    final calAsync = calService == null
-        ? const AsyncValue<Map<String, dynamic>>.data({})
-        : ref.watch(
-            StreamProvider<Map<String, dynamic>>(
-                (r) => calService.calibrationStream),
-          );
-    final cal = calAsync.value ?? {};
+    final cal = ref.watch(calibrationDataProvider).value ?? {};
 
     final phLowRaw    = cal['ph_low_raw'] as num?;
     final phHighRaw   = cal['ph_high_raw'] as num?;
@@ -171,6 +165,7 @@ class _CalibrationScreenState extends ConsumerState<CalibrationScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            const DemoModeBanner(),
             // ── Info banner ────────────────────────────────────────────────
             AppCard(
               margin: const EdgeInsets.only(bottom: 24),

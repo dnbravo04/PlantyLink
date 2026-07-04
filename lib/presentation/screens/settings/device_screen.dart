@@ -23,6 +23,18 @@ class DeviceScreen extends ConsumerWidget {
     final c = AppColors.of(context);
     final sensorAsync = ref.watch(sensorProvider);
 
+    final activeId = kDemoMode
+        ? 'ESP32-DEMO'
+        : ref.watch(deviceContextProvider).value?.esp32Id;
+    final devices = ref.watch(linkedDevicesProvider).value ?? const [];
+    var activeName = 'ESP32';
+    for (final d in devices) {
+      if (d.id == activeId) {
+        activeName = d.nombre;
+        break;
+      }
+    }
+
     return AppScaffold(
       appBar: AppBar(
         title: const Text('Mi dispositivo'),
@@ -32,7 +44,7 @@ class DeviceScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          _buildDeviceStatusCard(sensorAsync, c, context),
+          _buildDeviceStatusCard(sensorAsync, c, context, activeName, activeId),
           const SizedBox(height: 24),
           Text('Mis dispositivos',
               style: TextStyle(
@@ -68,7 +80,11 @@ class DeviceScreen extends ConsumerWidget {
   }
 
   Widget _buildDeviceStatusCard(
-      AsyncValue<SensorData> sensorAsync, AppColorScheme c, BuildContext context) {
+      AsyncValue<SensorData> sensorAsync,
+      AppColorScheme c,
+      BuildContext context,
+      String activeName,
+      String? activeId) {
     return sensorAsync.when(
       data: (sensor) {
         final connected = sensor.conectado ?? false;
@@ -99,12 +115,17 @@ class DeviceScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  connected ? 'ESP32 conectado' : 'ESP32 desconectado',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: c.textPrimary),
+                Expanded(
+                  child: Text(
+                    connected
+                        ? '$activeName conectado'
+                        : '$activeName desconectado',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: c.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ]),
               const SizedBox(height: 16),
@@ -115,10 +136,11 @@ class DeviceScreen extends ConsumerWidget {
                     color: c.cardBorder.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.info_outline, color: c.textSecondary, size: 16),
+                  child: Icon(Icons.qr_code_2_rounded,
+                      color: c.textSecondary, size: 16),
                 ),
                 const SizedBox(width: 12),
-                Text('Versión 1.0.0',
+                Text('ID: ${activeId ?? '—'}',
                     style: TextStyle(fontSize: 13, color: c.textSecondary)),
               ]),
               const SizedBox(height: 16),
