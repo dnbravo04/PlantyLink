@@ -308,6 +308,14 @@ final alertHistoryProvider = StreamProvider<List<TrendAlert>>((ref) {
   return service.alertHistoryStream;
 });
 
+/// Stream of the device's calibration data. Empty map in demo mode or when
+/// no device is linked.
+final calibrationDataProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  final service = ref.watch(calibrationServiceProvider);
+  if (service == null) return Stream.value(const {});
+  return service.calibrationStream;
+});
+
 /// Stream of pump/actuator schedules from Firebase, sorted by start time.
 /// Returns an empty stream when no device is linked.
 final schedulesProvider = StreamProvider<List<PumpSchedule>>((ref) {

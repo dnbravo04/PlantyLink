@@ -1,5 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_config.dart';
+import '../../core/services/device_context.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
 import '../../core/theme/app_tokens.dart';
@@ -8,6 +11,7 @@ import '../../core/utils/haptics.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/animated_app_card.dart';
+import '../widgets/common/user_avatar.dart';
 import 'settings/profile_settings_screen.dart';
 import 'settings/crop_settings_screen.dart';
 import 'settings/preferences_screen.dart';
@@ -34,7 +38,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          _buildUserHeader(userAsync, c),
+          _buildUserHeader(context, ref, userAsync, c),
           const SizedBox(height: 20),
           AnimatedAppCard(
             delay: 0,
@@ -42,7 +46,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.person_outline_rounded,
               color: c.info,
               title: 'Perfil y cuenta',
-              subtitle: 'Nombre, ciudad, contraseña',
+              subtitle: 'Nombre, foto, contraseña',
               onTap: () {
                 AppHaptics.light();
                 Navigator.push(context,
@@ -78,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.palette_outlined,
               color: c.accent,
               title: 'Preferencias',
-              subtitle: 'Tema, sensores, notificaciones',
+              subtitle: 'Tema, unidades, notificaciones',
               onTap: () {
                 AppHaptics.light();
                 Navigator.push(context,
@@ -94,19 +98,21 @@ class SettingsScreen extends ConsumerWidget {
               icon: Icons.memory_rounded,
               color: _deviceColor(sensorAsync, c),
               title: 'Mi dispositivo',
-              subtitle: sensorAsync.when(
-                data: (s) => (s.conectado ?? false)
-                    ? 'ESP32 conectado'
-                    : 'ESP32 desconectado',
-                loading: () => 'Verificando...',
-                error: (_, _) => 'Error de conexión',
-              ),
+              subtitle: _deviceSubtitle(ref, sensorAsync),
               onTap: () {
                 AppHaptics.light();
                 Navigator.push(context,
                     AppPageRoute(builder: (_) => const DeviceScreen()));
               },
               c: c,
+            ),
+          ),
+          const SizedBox(height: 28),
+          // Version footer
+          Center(
+            child: Text(
+              'PlantyLink v0.1.0',
+              style: TextStyle(fontSize: 11, color: c.textMuted),
             ),
           ),
           const SizedBox(height: 24),
@@ -122,41 +128,62 @@ class SettingsScreen extends ConsumerWidget {
         c.textSecondary;
   }
 
-  Widget _buildUserHeader(
+  /// "Invernadero · conectado · 2 vinculados" — active device name, live
+  /// connection state, and device count when more than one is linked.
+  String _deviceSubtitle(WidgetRef ref, AsyncValue sensorAsync) {
+    final devices = ref.watch(linkedDevicesProvider).value ?? const [];
+    final activeId = kDemoMode
+        ? 'ESP32-DEMO'
+        : ref.watch(deviceContextProvider).value?.esp32Id;
+
+    String name = 'ESP32';
+    for (final d in devices) {
+      if (d.id == activeId) {
+        name = d.nombre;
+        break;
+      }
+    }
+
+    final state = sensorAsync.whenOrNull(
+          data: (s) => (s.conectado ?? false) ? 'conectado' : 'desconectado',
+        ) ??
+        'verificando...';
+
+    final count = devices.length > 1 ? ' · ${devices.length} vinculados' : '';
+    return '$name · $state$count';
+  }
+
+  Widget _buildUserHeader(BuildContext context, WidgetRef ref,
       AsyncValue<Map<String, dynamic>> userAsync, AppColorScheme c) {
-    return userAsync.when(
-      data: (user) {
-        final name = user['nombre']?.toString() ?? '';
-        return Container(
+    final user = userAsync.value ?? const {};
+    final name = user['nombre']?.toString() ?? '';
+    final authUser = FirebaseAuth.instance.currentUser;
+    final identity = authUser?.email ??
+        authUser?.phoneNumber ??
+        user['ciudad']?.toString() ??
+        '';
+    final experience = ref.watch(experienceProvider);
+    final isNovato = experience == 'novato';
+
+    return Material(
+      color: c.cardBackground,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          AppHaptics.light();
+          Navigator.push(context,
+              AppPageRoute(builder: (_) => const ProfileSettingsScreen()));
+        },
+        child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: c.cardBackground,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: c.cardBorder, width: 1.5),
           ),
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [c.info, c.accent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Center(
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
-                  ),
-                ),
-              ),
+              UserAvatar(user: user, size: 56, radius: 18),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -169,22 +196,51 @@ class SettingsScreen extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                           color: c.textPrimary),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      user['ciudad']?.toString() ?? '',
-                      style: TextStyle(fontSize: 13, color: c.textSecondary),
+                    if (identity.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        identity,
+                        style: TextStyle(fontSize: 12, color: c.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (isNovato ? c.success : c.info)
+                            .withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isNovato ? Icons.spa_outlined : Icons.science_outlined,
+                            size: 12,
+                            color: isNovato ? c.success : c.info,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isNovato ? 'Principiante' : 'Avanzado',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isNovato ? c.success : c.info,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+              Icon(Icons.chevron_right_rounded, color: c.textMuted),
             ],
           ),
-        );
-      },
-      loading: () =>
-          Center(child: CircularProgressIndicator(strokeWidth: 2, color: c.primary)),
-      error: (_, _) =>
-          Text('Error al cargar perfil', style: TextStyle(color: c.textSecondary)),
+        ),
+      ),
     );
   }
 

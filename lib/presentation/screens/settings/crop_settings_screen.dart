@@ -19,29 +19,32 @@ class _CropSettingsScreenState extends ConsumerState<CropSettingsScreen> {
   double _tempMin = 18, _tempMax = 26;
   double _phMin = 5.5, _phMax = 6.5;
   double _ecMin = 1.0, _ecMax = 2.0;
-  bool _thresholdInitialized = false;
+
+  /// Name of the plant the sliders were last seeded from. Seeding happens
+  /// in build (a ref.listen would miss the already-emitted profile) and
+  /// re-runs when the active plant changes (e.g. after "Cambiar").
+  String? _seededFor;
+  bool get _thresholdInitialized => _seededFor != null;
+
+  void _seedFrom(PlantProfile profile) {
+    _seededFor = profile.nombre;
+    _tempMin = profile.tempMin;
+    _tempMax = profile.tempMax;
+    _phMin = profile.phMin;
+    _phMax = profile.phMax;
+    _ecMin = profile.ecMin;
+    _ecMax = profile.ecMax;
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final profileAsync = ref.watch(activePlantProfileProvider);
 
-    ref.listen<AsyncValue<PlantProfile?>>(activePlantProfileProvider,
-        (_, next) {
-      next.whenData((profile) {
-        if (profile != null && !_thresholdInitialized) {
-          setState(() {
-            _thresholdInitialized = true;
-            _tempMin = profile.tempMin;
-            _tempMax = profile.tempMax;
-            _phMin = profile.phMin;
-            _phMax = profile.phMax;
-            _ecMin = profile.ecMin;
-            _ecMax = profile.ecMax;
-          });
-        }
-      });
-    });
+    final profile = profileAsync.value;
+    if (profile != null && _seededFor != profile.nombre) {
+      _seedFrom(profile);
+    }
 
     return AppScaffold(
       appBar: AppBar(
@@ -263,7 +266,8 @@ class _CropSettingsScreenState extends ConsumerState<CropSettingsScreen> {
                         (p) => p.nombre == profile.nombre,
                         orElse: () => profile);
                     repo.selectPlant(match);
-                    setState(() => _thresholdInitialized = false);
+                    // Re-seed the sliders from the restored catalog values.
+                    setState(() => _seedFrom(match));
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: c.textSecondary,
