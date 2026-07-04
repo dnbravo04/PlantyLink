@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/units.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/sensor_data.dart';
@@ -70,8 +71,14 @@ class SimpleMetric extends StatelessWidget {
 class SimpleMetricsGrid extends StatelessWidget {
   final SensorData sensor;
   final PlantProfile? profile;
+  final UnitsPrefs units;
 
-  const SimpleMetricsGrid({super.key, required this.sensor, this.profile});
+  const SimpleMetricsGrid({
+    super.key,
+    required this.sensor,
+    this.profile,
+    this.units = const UnitsPrefs(),
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +97,8 @@ class SimpleMetricsGrid extends StatelessWidget {
             Expanded(
               child: SimpleMetric(
                 label: 'Temperatura',
-                value: '${sensor.temperatura?.toStringAsFixed(1)}°C',
+                value:
+                    '${units.formatTemp(sensor.temperatura ?? 0)}${units.tempUnit}',
                 icon: Icons.thermostat_outlined,
                 isInRange: tempInRange,
               ),
@@ -112,7 +120,7 @@ class SimpleMetricsGrid extends StatelessWidget {
             Expanded(
               child: SimpleMetric(
                 label: 'Conductividad',
-                value: '${ecVal.toStringAsFixed(2)} mS/cm',
+                value: '${units.formatEc(ecVal)} ${units.ecUnit}',
                 icon: Icons.electric_bolt_outlined,
                 isInRange: ecInRange,
               ),

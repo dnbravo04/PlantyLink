@@ -10,6 +10,8 @@ import '../../core/services/profile_service.dart';
 import '../../core/services/device_service.dart';
 import '../../core/services/user_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/weather_service.dart';
+import '../../core/utils/units.dart';
 import '../../core/services/calibration_service.dart';
 import '../../core/services/schedule_service.dart';
 import '../../domain/repositories/sensor_repository.dart';
@@ -209,9 +211,11 @@ class VisualizationModeNotifier extends Notifier<String> {
   String build() {
     // Follows the stored preference. set() takes effect immediately; outside
     // demo mode the stored value catches up once the RTDB write lands.
-    return ref.watch(userProfileProvider).value?['modo_visualizacion']
-            as String? ??
-        'tecnica';
+    // Without an explicit choice, beginners default to the simple view.
+    final stored = ref.watch(userProfileProvider).value?['modo_visualizacion']
+        as String?;
+    if (stored != null) return stored;
+    return ref.watch(experienceProvider) == 'novato' ? 'sencilla' : 'tecnica';
   }
 
   void set(String mode) {
@@ -226,6 +230,67 @@ class VisualizationModeNotifier extends Notifier<String> {
 final visualizationModeProvider =
     NotifierProvider<VisualizationModeNotifier, String>(
         VisualizationModeNotifier.new);
+
+class ExperienceNotifier extends Notifier<String> {
+  @override
+  String build() {
+    return ref.watch(userProfileProvider).value?['experiencia'] as String? ??
+        'novato';
+  }
+
+  void set(String level) {
+    state = level;
+    ref.read(userServiceProvider)?.updateUserSettings({'experiencia': level});
+  }
+}
+
+/// Grower experience level (`novato` | `avanzado`). Drives the default
+/// visualization mode and how much technical detail screens show.
+final experienceProvider =
+    NotifierProvider<ExperienceNotifier, String>(ExperienceNotifier.new);
+
+class UnitsNotifier extends Notifier<UnitsPrefs> {
+  @override
+  UnitsPrefs build() {
+    final user = ref.watch(userProfileProvider).value;
+    return UnitsPrefs(
+      fahrenheit: user?['unidad_temp'] == 'F',
+      microSiemens: user?['unidad_ec'] == 'uS',
+    );
+  }
+
+  void setFahrenheit(bool value) {
+    state = UnitsPrefs(fahrenheit: value, microSiemens: state.microSiemens);
+    ref.read(userServiceProvider)?.updateUserSettings(
+        {'unidad_temp': value ? 'F' : 'C'});
+  }
+
+  void setMicroSiemens(bool value) {
+    state = UnitsPrefs(fahrenheit: state.fahrenheit, microSiemens: value);
+    ref.read(userServiceProvider)?.updateUserSettings(
+        {'unidad_ec': value ? 'uS' : 'mS'});
+  }
+}
+
+/// Display units for temperature (°C/°F) and EC (mS/µS). Data is stored in
+/// °C and mS/cm; conversion happens at presentation time only.
+final unitsProvider =
+    NotifierProvider<UnitsNotifier, UnitsPrefs>(UnitsNotifier.new);
+
+/// Current weather for the user's `ciudad`. Null hides the dashboard chip
+/// (no city set, geocoding miss, or network failure). Demo mode shows fixed
+/// conditions so the UI is visible. Refreshed via the dashboard's
+/// pull-to-refresh (ref.invalidate) with a 30-minute service-side cache.
+final weatherProvider = FutureProvider<WeatherInfo?>((ref) async {
+  if (kDemoMode) {
+    return const WeatherInfo(
+        ciudad: 'Ciudad Demo', tempC: 23, humidity: 55, weatherCode: 1);
+  }
+  final ciudad =
+      ref.watch(userProfileProvider).value?['ciudad'] as String?;
+  if (ciudad == null || ciudad.trim().isEmpty) return null;
+  return WeatherService().fetchForCity(ciudad);
+});
 
 /// True when the device has any active network connection.
 final connectivityProvider = StreamProvider<bool>((ref) {

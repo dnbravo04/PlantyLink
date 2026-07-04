@@ -25,6 +25,7 @@ class _PerfilScreenState extends State<PerfilScreen>
   bool   _cargando    = false;
   String? _error;
   String? _fotoB64;
+  String  _experiencia = 'novato';
 
   late AnimationController _anim;
   late Animation<double>   _fade;
@@ -37,6 +38,8 @@ class _PerfilScreenState extends State<PerfilScreen>
       duration: const Duration(milliseconds: 600),
     )..forward();
     _fade = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
+    // Google accounts arrive with a display name — prefill it.
+    _nombreCtrl.text = FirebaseAuth.instance.currentUser?.displayName ?? '';
   }
 
   @override
@@ -81,10 +84,15 @@ class _PerfilScreenState extends State<PerfilScreen>
       // dispositivos, settings or fcm_token under this node.
       await db.ref('usuarios/${user.uid}').update({
         'nombre': nombre,
+        'experiencia': _experiencia,
         if (ciudad.isNotEmpty) 'ciudad': ciudad,
         if (_fotoB64 != null) 'foto_b64': _fotoB64,
         'creado': ServerValue.timestamp,
       });
+      // Mirror to FirebaseAuth (best-effort).
+      try {
+        await user.updateDisplayName(nombre);
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() { _error = 'Error al guardar perfil. Intenta de nuevo.'; _cargando = false; });
@@ -214,6 +222,44 @@ class _PerfilScreenState extends State<PerfilScreen>
                               prefixIcon: Icon(Icons.location_city_outlined),
                             ),
                           ),
+                          const SizedBox(height: 20),
+
+                          // Experience level
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '¿Cuánta experiencia tienes en hidroponía?',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _ExperienceOption(
+                                label: 'Principiante',
+                                subtitle: 'Vista sencilla y consejos',
+                                icon: Icons.spa_outlined,
+                                selected: _experiencia == 'novato',
+                                colors: c,
+                                onTap: () => setState(
+                                    () => _experiencia = 'novato'),
+                              ),
+                              const SizedBox(width: 10),
+                              _ExperienceOption(
+                                label: 'Avanzado',
+                                subtitle: 'Vista técnica completa',
+                                icon: Icons.science_outlined,
+                                selected: _experiencia == 'avanzado',
+                                colors: c,
+                                onTap: () => setState(
+                                    () => _experiencia = 'avanzado'),
+                              ),
+                            ],
+                          ),
 
                           if (_error != null) ...[
                             const SizedBox(height: 12),
@@ -262,6 +308,70 @@ class _PerfilScreenState extends State<PerfilScreen>
           ),
         ],
       ),
+      ),
+    );
+  }
+}
+
+// ── Experience option ─────────────────────────────────────────────────────────
+class _ExperienceOption extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final bool selected;
+  final AppColorScheme colors;
+  final VoidCallback onTap;
+
+  const _ExperienceOption({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.selected,
+    required this.colors,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = colors;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected
+                ? c.primary.withValues(alpha: 0.12)
+                : c.background,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? c.primary : c.cardBorder,
+              width: selected ? 2 : 1.5,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon,
+                  size: 22, color: selected ? c.primary : c.textMuted),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? c.primary : c.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: c.textMuted),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

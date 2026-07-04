@@ -84,9 +84,17 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           const SizedBox(height: 8),
           _buildThemeCard(c),
           const SizedBox(height: 24),
+          _buildSectionTitle('Nivel de experiencia', c),
+          const SizedBox(height: 8),
+          _buildExperienceCard(c),
+          const SizedBox(height: 24),
           _buildSectionTitle('Modo de visualización', c),
           const SizedBox(height: 8),
           _buildVisualizationModeCard(c),
+          const SizedBox(height: 24),
+          _buildSectionTitle('Unidades', c),
+          const SizedBox(height: 8),
+          _buildUnitsCard(c),
           const SizedBox(height: 24),
           _buildSectionTitle('Sensores activos', c),
           const SizedBox(height: 8),
@@ -138,6 +146,94 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           textStyle: WidgetStatePropertyAll(
               const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildExperienceCard(AppColorScheme c) {
+    final experience = ref.watch(experienceProvider);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ModeOption(
+              label: 'Principiante',
+              icon: Icons.spa_outlined,
+              selected: experience == 'novato',
+              color: c.success,
+              c: c,
+              onTap: () =>
+                  ref.read(experienceProvider.notifier).set('novato'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _ModeOption(
+              label: 'Avanzado',
+              icon: Icons.science_outlined,
+              selected: experience == 'avanzado',
+              color: c.info,
+              c: c,
+              onTap: () =>
+                  ref.read(experienceProvider.notifier).set('avanzado'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnitsCard(AppColorScheme c) {
+    final units = ref.watch(unitsProvider);
+    final notifier = ref.read(unitsProvider.notifier);
+
+    Widget row(String label, List<(String, bool)> options,
+        void Function(bool) onChanged, bool current) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(label,
+                style: TextStyle(fontSize: 14, color: c.textPrimary)),
+          ),
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: const WidgetStatePropertyAll(
+                  TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ),
+            segments: [
+              for (final (text, value) in options)
+                ButtonSegment(value: value, label: Text(text)),
+            ],
+            selected: {current},
+            onSelectionChanged: (s) => onChanged(s.first),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.cardBorder),
+      ),
+      child: Column(
+        children: [
+          row('Temperatura', [('°C', false), ('°F', true)],
+              notifier.setFahrenheit, units.fahrenheit),
+          const SizedBox(height: 12),
+          row('Conductividad', [('mS/cm', false), ('µS/cm', true)],
+              notifier.setMicroSiemens, units.microSiemens),
+        ],
       ),
     );
   }

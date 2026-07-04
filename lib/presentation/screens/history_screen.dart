@@ -70,6 +70,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(historyStreamProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
+    final units = ref.watch(unitsProvider);
     final c = AppColors.of(context);
 
     return AppScaffold(
@@ -162,12 +163,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   )
                 else ...[
                   _ChartCard(
-                    title: 'Temperatura (°C)',
+                    title: 'Temperatura (${units.tempUnit})',
                     lineColor: c.success,
                     history: filtered,
-                    valueExtractor: (s) => s.temperatura ?? 0,
-                    minLimit: profileAsync.value?.tempMin,
-                    maxLimit: profileAsync.value?.tempMax,
+                    valueExtractor: (s) =>
+                        units.tempValue(s.temperatura ?? 0),
+                    minLimit: profileAsync.value == null
+                        ? null
+                        : units.tempValue(profileAsync.value!.tempMin),
+                    maxLimit: profileAsync.value == null
+                        ? null
+                        : units.tempValue(profileAsync.value!.tempMax),
                   ),
                   const SizedBox(height: 20),
                   _ChartCard(
@@ -180,12 +186,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                   const SizedBox(height: 20),
                   _ChartCard(
-                    title: 'Conductividad EC (mS/cm)',
+                    title: 'Conductividad EC (${units.ecUnit})',
                     lineColor: c.warning,
                     history: filtered,
-                    valueExtractor: (s) => s.ecNormalized,
-                    minLimit: profileAsync.value?.ecMin,
-                    maxLimit: profileAsync.value?.ecMax,
+                    valueExtractor: (s) => units.ecValue(s.ecNormalized),
+                    minLimit: profileAsync.value == null
+                        ? null
+                        : units.ecValue(profileAsync.value!.ecMin),
+                    maxLimit: profileAsync.value == null
+                        ? null
+                        : units.ecValue(profileAsync.value!.ecMax),
                   ),
                 ],
               ],
