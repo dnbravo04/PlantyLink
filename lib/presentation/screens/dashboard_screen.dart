@@ -1,12 +1,15 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/units.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/trend_alert.dart';
@@ -20,6 +23,8 @@ import '../widgets/common/user_avatar.dart';
 import '../widgets/dashboard/illuminated_button.dart';
 import '../widgets/dashboard/simple_metric.dart';
 import '../widgets/dashboard/sensor_card.dart';
+import 'settings/preferences_screen.dart';
+import 'settings/profile_settings_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -32,6 +37,7 @@ class DashboardScreen extends ConsumerWidget {
     final profileAsync = ref.watch(activePlantProfileProvider);
     final visualizationMode = ref.watch(visualizationModeProvider);
     final userAsync = ref.watch(userProfileProvider);
+    final units = ref.watch(unitsProvider);
 
     final sensorRepo = ref.read(sensorRepositoryProvider);
 
@@ -106,6 +112,7 @@ class DashboardScreen extends ConsumerWidget {
           HapticFeedback.mediumImpact();
           // Force re-read — Riverpod stream will emit new data
           ref.invalidate(sensorProvider);
+          ref.invalidate(weatherProvider);
           await Future.delayed(const Duration(milliseconds: 600));
         },
         child: SafeArea(
@@ -113,11 +120,14 @@ class DashboardScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               const SizedBox(height: 12),
-              _buildHeader(plantaAsync, sensorAsync, userAsync, c),
-              const SizedBox(height: 16),
+              _buildHeader(context, plantaAsync, sensorAsync, userAsync, c),
+              const SizedBox(height: 10),
+              _buildWeatherChip(ref, units, c),
+              const SizedBox(height: 10),
               _DashboardViewToggle(visualizationMode: visualizationMode),
               const SizedBox(height: 16),
-              _buildMetrics(sensorAsync, profileAsync, visualizationMode, c),
+              _buildMetrics(
+                  sensorAsync, profileAsync, visualizationMode, units, c),
               const SizedBox(height: 8),
               _buildActuators(sensorAsync, ref, c),
               const SizedBox(height: 8),
@@ -136,6 +146,7 @@ class DashboardScreen extends ConsumerWidget {
   // ── Header with user name ─────────────────────────────────────────────
 
   Widget _buildHeader(
+    BuildContext context,
     AsyncValue<String> plantaAsync,
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<Map<String, dynamic>> userAsync,
@@ -158,8 +169,15 @@ class DashboardScreen extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Avatar (photo → Google picture → initial)
-        UserAvatar(user: userAsync.value ?? const {}, size: 42, radius: 14),
+        // Avatar (photo → Google picture → initial) — tap for account menu
+        GestureDetector(
+          onTap: () {
+            AppHaptics.light();
+            _showAccountSheet(context, userAsync.value ?? const {});
+          },
+          child: UserAvatar(
+              user: userAsync.value ?? const {}, size: 42, radius: 14),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -257,12 +275,138 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
+  // ── Weather (uses the profile's ciudad) ─────────────────────────────────
+
+  Widget _buildWeatherChip(WidgetRef ref, UnitsPrefs units, AppColorScheme c) {
+    final weather = ref.watch(weatherProvider).value;
+    if (weather == null) return const SizedBox.shrink();
+
+    final icon = weather.isClear
+        ? Icons.wb_sunny_rounded
+        : weather.isRainy
+            ? Icons.water_drop_rounded
+            : Icons.cloud_rounded;
+    final iconColor = weather.isClear
+        ? c.warning
+        : weather.isRainy
+            ? c.info
+            : c.textMuted;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+        border: Border.all(color: c.cardBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 8),
+          Text(
+            '${units.formatTemp(weather.tempC)}${units.tempUnit} · '
+            '${weather.descripcion}',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: c.textSecondary,
+            ),
+          ),
+          const Spacer(),
+          Icon(Icons.location_on_outlined, size: 13, color: c.textMuted),
+          const SizedBox(width: 2),
+          Text(
+            '${weather.ciudad} · ${weather.humidity.round()}% HR',
+            style: GoogleFonts.plusJakartaSans(
+                fontSize: 11, color: c.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Account sheet (avatar menu) ─────────────────────────────────────────
+
+  void _showAccountSheet(BuildContext context, Map<String, dynamic> user) {
+    final c = AppColors.of(context);
+    final authUser = FirebaseAuth.instance.currentUser;
+    final nombre = user['nombre']?.toString() ?? 'Usuario';
+    final identity = authUser?.email ?? authUser?.phoneNumber ?? '';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: c.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            UserAvatar(user: user, size: 64, radius: 20),
+            const SizedBox(height: 10),
+            Text(nombre,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: c.textPrimary)),
+            if (identity.isNotEmpty)
+              Text(identity,
+                  style: TextStyle(fontSize: 12, color: c.textMuted)),
+            const SizedBox(height: 12),
+            Divider(height: 1, color: c.cardBorder),
+            ListTile(
+              leading: Icon(Icons.person_outline_rounded, color: c.primary),
+              title: Text('Perfil y cuenta',
+                  style: TextStyle(color: c.textPrimary, fontSize: 14)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ProfileSettingsScreen()));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.tune_rounded, color: c.info),
+              title: Text('Preferencias',
+                  style: TextStyle(color: c.textPrimary, fontSize: 14)),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PreferencesScreen()));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.logout_rounded, color: c.error),
+              title: Text('Cerrar sesión',
+                  style: TextStyle(color: c.error, fontSize: 14)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await GoogleSignIn().signOut();
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Metrics ─────────────────────────────────────────────────────────────
 
   Widget _buildMetrics(
     AsyncValue<SensorData> sensorAsync,
     AsyncValue<PlantProfile?> profileAsync,
     String visualizationMode,
+    UnitsPrefs units,
     AppColorScheme c,
   ) {
     return sensorAsync.when(
@@ -274,7 +418,8 @@ class DashboardScreen extends ConsumerWidget {
         final profile = profileAsync.value;
 
         if (visualizationMode == 'sencilla') {
-          return SimpleMetricsGrid(sensor: sensor, profile: profile);
+          return SimpleMetricsGrid(
+              sensor: sensor, profile: profile, units: units);
         }
 
         final ecVal = sensor.ecNormalized;
@@ -287,8 +432,8 @@ class DashboardScreen extends ConsumerWidget {
                   delay: 0,
                   child: SensorCard(
                     label: 'Temperatura',
-                    value: (sensor.temperatura ?? 0).toStringAsFixed(1),
-                    unit: '°C',
+                    value: units.formatTemp(sensor.temperatura ?? 0),
+                    unit: units.tempUnit,
                     icon: Icons.thermostat_outlined,
                     statusColor: _tempColor(sensor.temperatura ?? 0, c),
                     isInRange: true,
@@ -319,8 +464,8 @@ class DashboardScreen extends ConsumerWidget {
                   delay: 160,
                   child: SensorCard(
                     label: 'Conductividad',
-                    value: ecVal.toStringAsFixed(2),
-                    unit: 'mS/cm',
+                    value: units.formatEc(ecVal),
+                    unit: units.ecUnit,
                     icon: Icons.electric_bolt_outlined,
                     statusColor: _ecColor(ecVal, profile, c),
                     isInRange: profile == null ||

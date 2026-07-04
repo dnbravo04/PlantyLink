@@ -31,12 +31,18 @@ class UserService {
     });
   }
 
-  Future<void> updateUserProfile(String name, String city) {
+  Future<void> updateUserProfile(String name, String city) async {
     final uid = _uid;
-    if (uid == null) return Future.value();
-    return RetryPolicy.execute(
+    if (uid == null) return;
+    await RetryPolicy.execute(
       () => _db.ref('usuarios/$uid').update({'nombre': name, 'ciudad': city}),
     );
+    // Mirror to FirebaseAuth so the name survives outside RTDB (emails,
+    // future Firebase-first identity). Best-effort: RTDB stays the source
+    // of truth for the app.
+    try {
+      await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
+    } catch (_) {}
   }
 
   Future<void> updateUserSettings(Map<String, dynamic> settings) {
