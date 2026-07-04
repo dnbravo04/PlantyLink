@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/phone_utils.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../widgets/common/app_toast.dart';
 import '../../../app.dart';
 
 class SmsVerificationScreen extends StatefulWidget {
@@ -126,10 +127,9 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
             _cargando = false;
           });
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Código reenviado exitosamente'),
-              backgroundColor: AppColors.of(context).success,
-            ));
+            AppToast.show(context,
+                message: 'Código reenviado exitosamente',
+                type: ToastType.success);
           }
         },
         codeAutoRetrievalTimeout: (String verificationId) {

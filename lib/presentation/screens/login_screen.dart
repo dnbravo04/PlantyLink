@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/phone_utils.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
+import '../widgets/common/app_toast.dart';
 import '../widgets/common/brand_mark.dart';
 import '../../app.dart';
 
@@ -155,12 +156,9 @@ class _LoginScreenState extends State<LoginScreen>
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       if (mounted) {
         setState(() => _error = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Se envió un enlace de recuperación a $email'),
-            backgroundColor: AppColors.of(context).success,
-          ),
-        );
+        AppToast.show(context,
+            message: 'Se envió un enlace de recuperación a $email',
+            type: ToastType.success);
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _mapAuthError(e.code));
