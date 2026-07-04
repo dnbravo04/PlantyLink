@@ -1,10 +1,11 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/firebase_constants.dart';
+import '../../../core/services/user_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/utils/profile_photo.dart';
@@ -24,7 +25,7 @@ class _PerfilScreenState extends State<PerfilScreen>
   final _ciudadCtrl = TextEditingController();
   bool   _cargando    = false;
   String? _error;
-  String? _fotoB64;
+  Uint8List? _fotoBytes;
   String  _experiencia = 'novato';
 
   late AnimationController _anim;
@@ -51,10 +52,11 @@ class _PerfilScreenState extends State<PerfilScreen>
   }
 
   Future<void> _elegirFoto() async {
-    final action = await chooseProfilePhoto(context, canRemove: _fotoB64 != null);
+    final action =
+        await chooseProfilePhoto(context, canRemove: _fotoBytes != null);
     if (action == null) return;
-    setState(() => _fotoB64 = switch (action) {
-      ProfilePhotoPicked(:final base64Jpeg) => base64Jpeg,
+    setState(() => _fotoBytes = switch (action) {
+      ProfilePhotoPicked(:final bytes) => bytes,
       ProfilePhotoRemoved() => null,
     });
   }
@@ -86,13 +88,18 @@ class _PerfilScreenState extends State<PerfilScreen>
         'nombre': nombre,
         'experiencia': _experiencia,
         if (ciudad.isNotEmpty) 'ciudad': ciudad,
-        if (_fotoB64 != null) 'foto_b64': _fotoB64,
         'creado': ServerValue.timestamp,
       });
       // Mirror to FirebaseAuth (best-effort).
       try {
         await user.updateDisplayName(nombre);
       } catch (_) {}
+      // Photo is optional — upload it to Storage without blocking onboarding.
+      if (_fotoBytes != null) {
+        try {
+          await UserService().setUserPhoto(_fotoBytes!);
+        } catch (_) {}
+      }
     } catch (e) {
       if (mounted) {
         setState(() { _error = 'Error al guardar perfil. Intenta de nuevo.'; _cargando = false; });
@@ -193,7 +200,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                           // Avatar — tap to add an optional profile photo
                           _AvatarPlaceholder(
                             inicial: nombre.isNotEmpty ? nombre[0].toUpperCase() : null,
-                            fotoB64: _fotoB64,
+                            fotoBytes: _fotoBytes,
                             onTap: _cargando ? null : _elegirFoto,
                             colors: c,
                           ),
@@ -380,13 +387,13 @@ class _ExperienceOption extends StatelessWidget {
 // ── Avatar placeholder ────────────────────────────────────────────────────────
 class _AvatarPlaceholder extends StatelessWidget {
   final String? inicial;
-  final String? fotoB64;
+  final Uint8List? fotoBytes;
   final VoidCallback? onTap;
   final AppColorScheme colors;
 
   const _AvatarPlaceholder({
     this.inicial,
-    this.fotoB64,
+    this.fotoBytes,
     this.onTap,
     required this.colors,
   });
@@ -418,10 +425,10 @@ class _AvatarPlaceholder extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: fotoB64 != null
+                child: fotoBytes != null
                     ? ClipOval(
                         child: Image.memory(
-                          base64Decode(fotoB64!),
+                          fotoBytes!,
                           width: 88, height: 88,
                           fit: BoxFit.cover,
                           gaplessPlayback: true,

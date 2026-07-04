@@ -1,6 +1,8 @@
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../firebase_constants.dart';
 import '../retry_policy.dart';
 
@@ -53,22 +55,51 @@ class UserService {
     );
   }
 
-  // ── Profile photo (base64 JPEG, compressed client-side) ───────────────────
+  // ── Profile photo (Firebase Storage) ──────────────────────────────────────
 
-  Future<void> setUserPhoto(String base64Jpeg) {
+  /// Uploads the compressed JPEG to `usuarios/{uid}/perfil.jpg`, stores the
+  /// tokenized download URL at `usuarios/{uid}/foto_url`, retires the legacy
+  /// inline `foto_b64`, and mirrors the URL to FirebaseAuth.
+  Future<void> setUserPhoto(Uint8List jpegBytes) async {
     final uid = _uid;
-    if (uid == null) return Future.value();
-    return RetryPolicy.execute(
-      () => _db.ref('usuarios/$uid/foto_b64').set(base64Jpeg),
+    if (uid == null) return;
+
+    final ref = FirebaseStorage.instance.ref('usuarios/$uid/perfil.jpg');
+    await ref.putData(
+        jpegBytes, SettableMetadata(contentType: 'image/jpeg'));
+    final url = await ref.getDownloadURL();
+
+    await RetryPolicy.execute(
+      () => _db.ref('usuarios/$uid').update({
+        'foto_url': url,
+        'foto_b64': null, // retire the pre-Storage inline photo
+      }),
     );
+    try {
+      await FirebaseAuth.instance.currentUser?.updatePhotoURL(url);
+    } catch (_) {}
   }
 
-  Future<void> removeUserPhoto() {
+  Future<void> removeUserPhoto() async {
     final uid = _uid;
-    if (uid == null) return Future.value();
-    return RetryPolicy.execute(
-      () => _db.ref('usuarios/$uid/foto_b64').remove(),
+    if (uid == null) return;
+
+    try {
+      await FirebaseStorage.instance
+          .ref('usuarios/$uid/perfil.jpg')
+          .delete();
+    } catch (_) {
+      // Object may not exist (legacy base64-only photo) — keep going.
+    }
+    await RetryPolicy.execute(
+      () => _db.ref('usuarios/$uid').update({
+        'foto_url': null,
+        'foto_b64': null,
+      }),
     );
+    try {
+      await FirebaseAuth.instance.currentUser?.updatePhotoURL(null);
+    } catch (_) {}
   }
 
   // ── Alert settings ─────────────────────────────────────────────────────────

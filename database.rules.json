@@ -25,9 +25,14 @@
         ".read":  "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
 
-        // Profile photo: compressed base64 JPEG written by the app (≤ ~110 KB)
+        // Legacy inline profile photo (pre-Storage, base64 JPEG)
         "foto_b64": {
           ".validate": "newData.isString() && newData.val().length < 150000"
+        },
+
+        // Profile photo download URL (Firebase Storage)
+        "foto_url": {
+          ".validate": "newData.isString() && newData.val().length < 2048"
         }
       }
     },

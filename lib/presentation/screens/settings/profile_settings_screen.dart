@@ -60,8 +60,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     if (action == null) return;
     try {
       switch (action) {
-        case ProfilePhotoPicked(:final base64Jpeg):
-          await service.setUserPhoto(base64Jpeg);
+        case ProfilePhotoPicked(:final bytes):
+          await service.setUserPhoto(bytes);
         case ProfilePhotoRemoved():
           await service.removeUserPhoto();
       }
@@ -337,7 +337,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       AsyncValue<Map<String, dynamic>> userAsync, AppColorScheme c) {
     return userAsync.when(
       data: (user) {
-        final hasPhoto = (user['foto_b64'] as String?)?.isNotEmpty == true;
+        final hasPhoto = (user['foto_b64'] as String?)?.isNotEmpty == true ||
+            (user['foto_url'] as String?)?.isNotEmpty == true;
 
         return Container(
           padding: const EdgeInsets.all(20),
