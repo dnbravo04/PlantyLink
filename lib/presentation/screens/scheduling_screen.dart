@@ -6,6 +6,7 @@ import '../../models/pump_schedule.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/app_toast.dart';
 import '../widgets/common/demo_mode_banner.dart';
 
 const _actuadorLabels = {
@@ -58,7 +59,8 @@ class SchedulingScreen extends ConsumerWidget {
         loading: () =>
             Center(child: CircularProgressIndicator(color: c.primary)),
         error: (e, _) => Center(
-          child: Text('Error: $e', style: TextStyle(color: c.textSecondary)),
+          child: Text('No se pudieron cargar las programaciones',
+              style: TextStyle(color: c.textSecondary)),
         ),
         data: (schedules) {
           if (schedules.isEmpty) {
@@ -226,9 +228,8 @@ class _ScheduleDialogState extends State<_ScheduleDialog> {
   Future<void> _submit() async {
     final dur = int.tryParse(_duracionCtrl.text);
     if (dur == null || dur <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Duración inválida.')),
-      );
+      AppToast.show(context,
+          message: 'Duración inválida.', type: ToastType.error);
       return;
     }
     setState(() => _saving = true);
@@ -244,8 +245,9 @@ class _ScheduleDialogState extends State<_ScheduleDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        AppToast.show(context,
+            message: 'No se pudo guardar la programación.',
+            type: ToastType.error);
         setState(() => _saving = false);
       }
     }

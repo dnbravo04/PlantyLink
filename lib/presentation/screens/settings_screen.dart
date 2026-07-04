@@ -111,7 +111,7 @@ class SettingsScreen extends ConsumerWidget {
           // Version footer
           Center(
             child: Text(
-              'PlantyLink v0.1.0',
+              'PlantyLink v${ref.watch(appVersionProvider).value ?? '…'}',
               style: TextStyle(fontSize: 11, color: c.textMuted),
             ),
           ),

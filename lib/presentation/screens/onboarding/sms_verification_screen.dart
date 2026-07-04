@@ -91,7 +91,7 @@ class _SmsVerificationScreenState extends State<SmsVerificationScreen>
           'invalid-verification-code' => 'Código inválido. Verifica e intenta de nuevo',
           'code-expired' => 'El código expiró. Solicita uno nuevo',
           'session-expired' => 'La sesión expiró. Intenta nuevamente',
-          _ => 'Error: ${e.message}',
+          _ => 'No se pudo verificar el código. Intenta de nuevo',
         };
       });
     } finally {

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/app_config.dart';
 import '../../core/demo_data_service.dart';
 import '../../core/services/device_context.dart';
@@ -290,6 +291,13 @@ final weatherProvider = FutureProvider<WeatherInfo?>((ref) async {
       ref.watch(userProfileProvider).value?['ciudad'] as String?;
   if (ciudad == null || ciudad.trim().isEmpty) return null;
   return WeatherService().fetchForCity(ciudad);
+});
+
+/// App version straight from the platform ("2.0.0"), so UI footers never
+/// drift from pubspec.
+final appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return info.version;
 });
 
 /// True when the device has any active network connection.

@@ -1,7 +1,7 @@
 name: hydrotracker
 description: "PlantyLink — Monitoreo inteligente de sistemas hidropónicos."
 publish_to: 'none'
-version: 0.1.0+1
+version: 2.0.0+2
 
 environment:
   sdk: ^3.11.5
@@ -28,6 +28,7 @@ dependencies:
   share_plus: ^10.1.4
   path_provider: ^2.1.5
   image_picker: ^1.1.2
+  package_info_plus: ^8.1.0
   dio: ^5.4.0
   retrofit: ^4.9.0 # Bumped to align with newer generator
   freezed_annotation: ^3.1.0

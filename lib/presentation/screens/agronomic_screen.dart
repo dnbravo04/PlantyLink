@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/units.dart';
 import '../../domain/services/agronomic_service.dart';
 import '../../models/plant_profile.dart';
 import '../../models/sensor_data.dart';
@@ -42,6 +43,8 @@ class AgronomicScreen extends ConsumerWidget {
     }
 
     final sensor = sensorAsync.value;
+    final units = ref.watch(unitsProvider);
+    final isNovato = ref.watch(experienceProvider) == 'novato';
     final plantingDate = plantingDateAsync.value;
     final daysSince =
         plantingDate == null ? null : _daysSince(plantingDate);
@@ -85,6 +88,8 @@ class AgronomicScreen extends ConsumerWidget {
                   rec: recommendation,
                   currentPh: sensor?.ph,
                   currentEc: sensor?.ecNormalized,
+                  units: units,
+                  isNovato: isNovato,
                 ),
                 const SizedBox(height: AppTokens.spacingMd),
               ],
@@ -400,6 +405,8 @@ class _NutrientTargetsCard extends StatelessWidget {
     required this.rec,
     required this.currentPh,
     required this.currentEc,
+    required this.units,
+    required this.isNovato,
   });
 
   final int delay;
@@ -407,6 +414,8 @@ class _NutrientTargetsCard extends StatelessWidget {
   final NutrientRecommendation rec;
   final double? currentPh;
   final double? currentEc;
+  final UnitsPrefs units;
+  final bool isNovato;
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +430,16 @@ class _NutrientTargetsCard extends StatelessWidget {
             label: 'Objetivos de nutrición',
             c: c,
           ),
+          if (isNovato) ...[
+            const SizedBox(height: AppTokens.spacingSm),
+            _NoteBox(
+              c: c,
+              icon: Icons.school_outlined,
+              text: 'EC mide cuánto nutriente hay disuelto en el agua; '
+                  'NPK es la proporción nitrógeno-fósforo-potasio del '
+                  'fertilizante. Mantén los valores dentro del rango objetivo.',
+            ),
+          ],
           const SizedBox(height: AppTokens.spacingMd),
           Row(
             children: [
@@ -447,10 +466,10 @@ class _NutrientTargetsCard extends StatelessWidget {
           _RangeRow(
             c: c,
             label: 'EC objetivo',
-            unit: 'mS/cm',
-            min: rec.ecTargetMin,
-            max: rec.ecTargetMax,
-            current: currentEc,
+            unit: units.ecUnit,
+            min: units.ecValue(rec.ecTargetMin),
+            max: units.ecValue(rec.ecTargetMax),
+            current: currentEc == null ? null : units.ecValue(currentEc!),
           ),
           const SizedBox(height: AppTokens.spacingSm),
           _RangeRow(
@@ -1259,7 +1278,8 @@ class _Disclaimer extends StatelessWidget {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-String _fmt(double v) => v.toStringAsFixed(1);
+// µS/cm values are in the hundreds/thousands — decimals add only noise.
+String _fmt(double v) => v >= 100 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 String _formatDate(DateTime d) =>
     '${d.day.toString().padLeft(2, '0')}/'

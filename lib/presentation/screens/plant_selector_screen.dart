@@ -10,6 +10,7 @@ import '../../models/plant_profile.dart';
 import '../providers/app_providers.dart';
 import '../widgets/common/app_scaffold.dart';
 import '../widgets/common/app_card.dart';
+import '../widgets/common/app_toast.dart';
 
 class PlantSelectorScreen extends ConsumerStatefulWidget {
   const PlantSelectorScreen({super.key});
@@ -101,13 +102,9 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingMore = false);
-        final c = AppColors.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('No se pudo cargar más resultados.'),
-            backgroundColor: c.error,
-          ),
-        );
+        AppToast.show(context,
+            message: 'No se pudo cargar más resultados.',
+            type: ToastType.error);
       }
     }
   }
@@ -118,24 +115,16 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
     try {
       await plantRepo.selectPlant(planta);
       if (mounted) {
-        final c = AppColors.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${planta.emoji} Perfil ${planta.nombre} activado'),
-            backgroundColor: c.success,
-          ),
-        );
+        AppToast.show(context,
+            message: '${planta.emoji} Perfil ${planta.nombre} activado',
+            type: ToastType.success);
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        final c = AppColors.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No se pudo activar ${planta.nombre}. Verifica tu conexión.'),
-            backgroundColor: c.error,
-          ),
-        );
+        AppToast.show(context,
+            message: 'No se pudo activar ${planta.nombre}. Verifica tu conexión.',
+            type: ToastType.error);
       }
     }
   }
@@ -154,24 +143,17 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
                 .read(plantRepositoryProvider)
                 ?.selectPlant(plant);
             if (mounted) {
-              final c = AppColors.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('🌱 ${plant.nombre} activado'),
-                  backgroundColor: c.success,
-                ),
-              );
+              AppToast.show(context,
+                  message: '🌱 ${plant.nombre} activado',
+                  type: ToastType.success);
               Navigator.pop(context); // close selector
             }
           } catch (e) {
             if (mounted) {
-              final c = AppColors.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('No se pudo activar ${plant.nombre}. Verifica tu conexión.'),
-                  backgroundColor: c.error,
-                ),
-              );
+              AppToast.show(context,
+                  message:
+                      'No se pudo activar ${plant.nombre}. Verifica tu conexión.',
+                  type: ToastType.error);
             }
           }
         },
@@ -181,23 +163,14 @@ class _PlantSelectorScreenState extends ConsumerState<PlantSelectorScreen> {
                 .read(plantCatalogRepositoryProvider)
                 .saveToUserCatalog(plant, perenualId: perenualId);
             if (mounted) {
-              final c = AppColors.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Planta guardada en tu catálogo'),
-                  backgroundColor: c.success,
-                ),
-              );
+              AppToast.show(context,
+                  message: 'Planta guardada en tu catálogo',
+                  type: ToastType.success);
             }
           } catch (_) {
             if (mounted) {
-              final c = AppColors.of(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Error al guardar planta'),
-                  backgroundColor: c.error,
-                ),
-              );
+              AppToast.show(context,
+                  message: 'Error al guardar planta', type: ToastType.error);
             }
           }
         },

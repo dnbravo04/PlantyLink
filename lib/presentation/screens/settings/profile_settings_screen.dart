@@ -42,9 +42,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
           );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar perfil')),
-        );
+        AppToast.show(context,
+            message: 'Error al guardar perfil', type: ToastType.error);
       }
     }
   }
@@ -85,14 +84,10 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         user.providerData.any((p) => p.providerId == 'password');
     if (!isEmailUser) {
       if (!mounted) return;
-      final c = AppColors.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'El cambio de contraseña solo aplica para cuentas de correo electrónico.'),
-          backgroundColor: c.textMuted,
-        ),
-      );
+      AppToast.show(context,
+          message:
+              'El cambio de contraseña solo aplica para cuentas de correo electrónico.',
+          type: ToastType.info);
       return;
     }
 
@@ -154,19 +149,16 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       );
 
       if (confirmed != true || !mounted) return;
-      final c = AppColors.of(context);
 
       if (newCtrl.text != confirmCtrl.text) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('Las contraseñas no coinciden.'),
-            backgroundColor: c.error));
+        AppToast.show(context,
+            message: 'Las contraseñas no coinciden.', type: ToastType.error);
         return;
       }
       if (newCtrl.text.length < 6) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text(
-                'La contraseña debe tener al menos 6 caracteres.'),
-            backgroundColor: c.error));
+        AppToast.show(context,
+            message: 'La contraseña debe tener al menos 6 caracteres.',
+            type: ToastType.error);
         return;
       }
 
@@ -176,17 +168,15 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         await user.reauthenticateWithCredential(cred);
         await user.updatePassword(newCtrl.text);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Contraseña actualizada.'),
-              backgroundColor: c.success));
+          AppToast.show(context,
+              message: 'Contraseña actualizada.', type: ToastType.success);
         }
       } on FirebaseAuthException catch (e) {
         if (!mounted) return;
         final msg = e.code == 'wrong-password'
             ? 'Contraseña actual incorrecta.'
-            : 'Error: ${e.message}';
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: c.error));
+            : 'No se pudo cambiar la contraseña. Intenta de nuevo.';
+        AppToast.show(context, message: msg, type: ToastType.error);
       }
     } finally {
       currentCtrl.dispose();
@@ -238,15 +228,15 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      final c = AppColors.of(context);
       if (e.code == 'requires-recent-login') {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text(
-                'Por seguridad, cierra sesión y vuelve a iniciarla antes de eliminar la cuenta.'),
-            backgroundColor: c.error));
+        AppToast.show(context,
+            message:
+                'Por seguridad, cierra sesión y vuelve a iniciarla antes de eliminar la cuenta.',
+            type: ToastType.error);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Error: ${e.message}'), backgroundColor: c.error));
+        AppToast.show(context,
+            message: 'No se pudo eliminar la cuenta. Intenta de nuevo.',
+            type: ToastType.error);
       }
     }
   }
