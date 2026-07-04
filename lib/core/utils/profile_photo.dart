@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_colors.dart';
@@ -7,17 +7,15 @@ import '../theme/app_colors.dart';
 sealed class ProfilePhotoAction {}
 
 class ProfilePhotoPicked extends ProfilePhotoAction {
-  final String base64Jpeg;
-  ProfilePhotoPicked(this.base64Jpeg);
+  final Uint8List bytes;
+  ProfilePhotoPicked(this.bytes);
 }
 
 class ProfilePhotoRemoved extends ProfilePhotoAction {}
 
 /// Shows a bottom sheet to pick a profile photo from the gallery or camera
-/// (optionally offering removal), then compresses it client-side.
-///
-/// The photo is resized to ≤384 px JPEG (~15–50 KB) so it can live directly
-/// in RTDB at `usuarios/{uid}/foto_b64` without needing Firebase Storage.
+/// (optionally offering removal), then compresses it client-side to a
+/// ≤512 px JPEG before it is uploaded to Firebase Storage.
 /// Returns null when the user cancels.
 Future<ProfilePhotoAction?> chooseProfilePhoto(
   BuildContext context, {
@@ -75,13 +73,12 @@ Future<ProfilePhotoAction?> chooseProfilePhoto(
 
   final file = await ImagePicker().pickImage(
     source: choice == 'camera' ? ImageSource.camera : ImageSource.gallery,
-    maxWidth: 384,
-    maxHeight: 384,
-    imageQuality: 65,
+    maxWidth: 512,
+    maxHeight: 512,
+    imageQuality: 75,
     requestFullMetadata: false,
   );
   if (file == null) return null;
 
-  final bytes = await file.readAsBytes();
-  return ProfilePhotoPicked(base64Encode(bytes));
+  return ProfilePhotoPicked(await file.readAsBytes());
 }

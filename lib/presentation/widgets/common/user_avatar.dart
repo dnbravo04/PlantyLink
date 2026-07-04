@@ -6,9 +6,10 @@ import '../../../core/theme/app_colors.dart';
 
 /// The user's avatar, resolved in priority order:
 ///
-/// 1. `usuarios/{uid}/foto_b64` — photo picked in the app (base64 JPEG)
-/// 2. [FirebaseAuth] `photoURL` — e.g. the Google account picture
-/// 3. Gradient tile with the first letter of [nombre]
+/// 1. `usuarios/{uid}/foto_b64` — legacy inline photo (pre-Storage)
+/// 2. `usuarios/{uid}/foto_url` — photo uploaded to Firebase Storage
+/// 3. [FirebaseAuth] `photoURL` — e.g. the Google account picture
+/// 4. Gradient tile with the first letter of `nombre`
 class UserAvatar extends StatelessWidget {
   /// The `usuarios/{uid}` map from `userProfileProvider` (may be empty).
   final Map<String, dynamic> user;
@@ -87,7 +88,8 @@ class UserAvatar extends StatelessWidget {
       ),
     );
 
-    final photoUrl = FirebaseAuth.instance.currentUser?.photoURL;
+    final photoUrl = (user['foto_url'] as String?) ??
+        FirebaseAuth.instance.currentUser?.photoURL;
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return ClipRRect(
         borderRadius: borderRadius,

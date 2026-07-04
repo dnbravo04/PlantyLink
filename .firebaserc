@@ -1,1 +1,5 @@
-{ "projects": { "default": "hydrotrack-13047" } }
+{
+  "projects": {
+    "default": "hydrotrack-13047"
+  }
+}
