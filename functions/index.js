@@ -7,7 +7,7 @@
  * which only fire while the app is open.
  *
  * RTDB layout (see lib/core/services/*.dart):
- *   devices/{esp32Id}/sensores      → live sensor values (written by ESP32)
+ *   devices/{esp32Id}/sensors       → live sensor values (written by ESP32)
  *   devices/{esp32Id}/profile       → active plant profile with thresholds
  *   devices/{esp32Id}/alert_state   → last-notified timestamps (this function)
  *   usuarios/{uid}/esp32_id         → device linked to the user
@@ -74,7 +74,7 @@ const CHECKS = [
 
 exports.sensorAlerts = onValueWritten(
     {
-      ref: "/devices/{esp32Id}/sensores",
+      ref: "/devices/{esp32Id}/sensors",
       instance: "hydrotrack-13047",
     },
     async (event) => {
