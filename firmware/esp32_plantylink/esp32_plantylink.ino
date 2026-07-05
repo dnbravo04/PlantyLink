@@ -9,12 +9,15 @@
  *   LEE   devices/{DEVICE_ID}/controls/riego_automatico   (bool, escrito por la app)
  *   ESCRIBE devices/{DEVICE_ID}/sensors/                  (cada PUBLISH_INTERVAL_MS)
  *       temperatura        °C            ← DHT22
- *       humedad_aire       %HR           ← DHT22   (clave NUEVA: la app aún no la muestra)
- *       humedad_suelo      %             ← sensor capacitivo (clave NUEVA: la app aún no la muestra)
- *       nivel_agua_tanque  %             ← humedad_suelo, SOLO si MAP_SOIL_TO_TANK=1 (shim de demo)
+ *       humedad_aire       %HR           ← DHT22            (la app la muestra, F0.2)
+ *       humedad_suelo      %             ← sensor capacitivo (la app la muestra, F0.2)
+ *       nivel_agua_tanque  %             ← humedad_suelo, SOLO si MAP_SOIL_TO_TANK=1 (shim, ahora 0)
  *       bomba_agua         bool          ← estado real del relé
  *       conectado          true
  *       timestamp          epoch ms      ← ServerValue.timestamp (hora del servidor RTDB)
+ *   ESCRIBE devices/{DEVICE_ID}/info/                     (una vez, al arrancar)
+ *       modelo_hardware, version_firmware, tipo_cultivo, sensores{}, actuadores{}
+ *       → modelo de capacidades (P1): la app muestra solo lo que este equipo tiene
  *
  * La app marca los datos como "stale" si timestamp tiene más de 10 s
  * (SensorStreamService.staleDataStream) → publicamos cada 5 s.
@@ -61,10 +64,14 @@
 // UID del tag NFC). Formato válido según la app: ^[a-zA-Z0-9][a-zA-Z0-9:\-_]{2,63}$
 #define DEVICE_ID       "pl-esp32-01"
 
-// Shim de demo: publica humedad_suelo también como nivel_agua_tanque para que
-// el gauge "Tanque de agua" del dashboard reaccione en vivo. Poner 0 cuando
-// exista sensor de nivel real o UI propia de humedad de suelo.
-#define MAP_SOIL_TO_TANK 1
+// Shim de demo (F0.2: RESUELTO). La app ya tiene tarjeta propia de humedad de
+// suelo, así que dejamos de prestar el campo nivel_agua_tanque. Poner a 1 solo
+// para demos con una versión antigua de la app que no muestra humedad_suelo.
+#define MAP_SOIL_TO_TANK 0
+
+// Identidad/capacidades publicadas en devices/{id}/info al arrancar.
+#define FW_VERSION      "0.1.0-demo"
+#define HW_MODEL        "esp32-soil-v1"
 
 // ─── Pines ───────────────────────────────────────────────────────────────────
 // GPIO 4 : DHT22 (digital). Sin conflicto con WiFi.
@@ -216,6 +223,23 @@ void selfRegister() {
   Serial.printf("[AUTH] registrado uid=%s → esp32_id=%s\n", uid.c_str(), DEVICE_ID);
 }
 
+// ─── Capacidades (modelo P1) → devices/{id}/info ─────────────────────────────
+// La app lee esto para mostrar SOLO los sensores/actuadores que este equipo
+// tiene, en vez de asumir el set hidropónico completo. Los sets se guardan como
+// mapas {clave: true} (RTDB desaconseja arrays).
+void declareCapabilities() {
+  FirebaseJson info;
+  info.set("modelo_hardware", HW_MODEL);
+  info.set("version_firmware", FW_VERSION);
+  info.set("tipo_cultivo", "suelo");
+  info.set("sensores/temperatura", true);
+  info.set("sensores/humedad_aire", true);
+  info.set("sensores/humedad_suelo", true);
+  info.set("actuadores/bomba_agua", true);
+  Firebase.RTDB.updateNode(&fbdo, kBasePath + "/info", &info);
+  Serial.println("[INFO] capacidades declaradas en devices/" DEVICE_ID "/info");
+}
+
 // ─── Setup / Loop ────────────────────────────────────────────────────────────
 void setup() {
   // Relé en reposo ANTES de configurar el pin: evita que la bomba arranque
@@ -262,6 +286,7 @@ void setup() {
   digitalWrite(PIN_LED_STATUS, HIGH);
 
   selfRegister();
+  declareCapabilities();
 
   if (!Firebase.RTDB.beginStream(&fbStream, kControlsPath)) {
     Serial.printf("[RTDB] beginStream falló: %s\n", fbStream.errorReason().c_str());
