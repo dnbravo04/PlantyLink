@@ -34,6 +34,8 @@ class DemoDataService {
   double _currentConductividad = 1500.0;
   double _currentNivelAgua = 75.0;
   double _currentNivelFertilizante = 60.0;
+  double _currentHumedadSuelo = 55.0; // cultivo en tierra
+  double _currentHumedadAire = 60.0; // DHT22
   bool _currentNivelAguaBool = true;
   bool _currentBombaAgua = false;
   bool _currentBombaFertilizante = false;
@@ -205,6 +207,12 @@ class DemoDataService {
     _currentNivelFertilizante += (rng.nextDouble() - 0.5) * 4;
     _currentNivelFertilizante = _currentNivelFertilizante.clamp(10.0, 100.0);
 
+    _currentHumedadSuelo += (rng.nextDouble() - 0.5) * 3;
+    _currentHumedadSuelo = _currentHumedadSuelo.clamp(20.0, 90.0);
+
+    _currentHumedadAire += (rng.nextDouble() - 0.5) * 2;
+    _currentHumedadAire = _currentHumedadAire.clamp(35.0, 85.0);
+
     // Occasionally simulate a low-water alert
     if (rng.nextDouble() < 0.05) {
       _currentNivelAguaBool = false;
@@ -220,6 +228,8 @@ class DemoDataService {
     _sensorController.add(
       SensorData.fromMap({
         'temperatura': _currentTemp,
+        'humedad_suelo': _currentHumedadSuelo,
+        'humedad_aire': _currentHumedadAire,
         'ph': _currentPh,
         'conductividad': _currentConductividad,
         'nivel_agua_tanque': _currentNivelAgua,
@@ -240,6 +250,8 @@ class DemoDataService {
 
     final entry = <String, dynamic>{
       'temperatura': _currentTemp,
+      'humedad_suelo': _currentHumedadSuelo,
+      'humedad_aire': _currentHumedadAire,
       'ph': _currentPh,
       'conductividad': _currentConductividad,
       'nivel_agua_tanque': _currentNivelAgua,

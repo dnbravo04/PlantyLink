@@ -426,6 +426,44 @@ class DashboardScreen extends ConsumerWidget {
 
         return Column(
           children: [
+            // Cultivo en tierra: humedad de suelo/ambiente (solo si el
+            // dispositivo las reporta — soil-first, ROADMAP_PRODUCTO.md P1).
+            if (sensor.humedadSuelo != null || sensor.humedadAire != null) ...[
+              Row(children: [
+                if (sensor.humedadSuelo != null)
+                  Expanded(
+                    child: AnimatedAppCard(
+                      delay: 0,
+                      child: SensorCard(
+                        label: 'Humedad de suelo',
+                        value: sensor.humedadSuelo!.toStringAsFixed(0),
+                        unit: '%',
+                        icon: Icons.grass_rounded,
+                        statusColor:
+                            _soilColor(sensor.humedadSuelo!, profile, c),
+                        isInRange: _soilInRange(sensor.humedadSuelo!, profile),
+                      ),
+                    ),
+                  ),
+                if (sensor.humedadSuelo != null && sensor.humedadAire != null)
+                  const SizedBox(width: 10),
+                if (sensor.humedadAire != null)
+                  Expanded(
+                    child: AnimatedAppCard(
+                      delay: 80,
+                      child: SensorCard(
+                        label: 'Humedad ambiente',
+                        value: sensor.humedadAire!.toStringAsFixed(0),
+                        unit: '%',
+                        icon: Icons.water_drop_outlined,
+                        statusColor: c.primary,
+                        isInRange: true,
+                      ),
+                    ),
+                  ),
+              ]),
+              const SizedBox(height: 10),
+            ],
             Row(children: [
               Expanded(
                 child: AnimatedAppCard(
@@ -764,6 +802,18 @@ class DashboardScreen extends ConsumerWidget {
     if (level < 20) return c.error;
     if (level < 50) return c.warning;
     return c.success;
+  }
+
+  bool _soilInRange(double v, PlantProfile? profile) {
+    final min = profile?.humedadSueloMin;
+    final max = profile?.humedadSueloMax;
+    if (min != null && v < min) return false;
+    if (max != null && v > max) return false;
+    return true;
+  }
+
+  Color _soilColor(double v, PlantProfile? profile, AppColorScheme c) {
+    return _soilInRange(v, profile) ? c.success : c.warning;
   }
 
   String _levelLabel(double level) {
