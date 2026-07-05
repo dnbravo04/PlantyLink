@@ -1,6 +1,11 @@
 # Secret keys — never commit the real file; use api_keys.dart.example as template
 lib/core/api_keys.dart
 
+# ESP32 firmware secrets (WiFi / Firebase device credentials) — see deuda #12.
+# The .ino ships with placeholders; real credentials must go in a gitignored
+# secrets.h once the firmware is refactored (Fase 2, post-demo).
+firmware/**/secrets.h
+
 # Release keystore & signing config — never commit to source control
 android/app/*.jks
 android/app/*.keystore
