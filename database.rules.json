@@ -13,7 +13,13 @@
     "devices": {
       "$esp32Id": {
         ".read":  "auth != null && (root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id || root.child('usuarios').child(auth.uid).child('dispositivos').child($esp32Id).exists())",
-        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id || root.child('usuarios').child(auth.uid).child('dispositivos').child($esp32Id).exists())"
+        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('esp32_id').val() === $esp32Id || root.child('usuarios').child(auth.uid).child('dispositivos').child($esp32Id).exists())",
+
+        // F0.3: index for orderByChild('timestamp') queries (history/alerts
+        // screens + client-side history pruning). Without this, RTDB warns and
+        // sorts client-side over the whole node.
+        "history": { ".indexOn": ["timestamp"] },
+        "alerts":  { ".indexOn": ["timestamp"] }
       }
     },
 
@@ -37,10 +43,29 @@
       }
     },
 
-    // ── Shared API response cache (read/write by any authenticated user) ────
+    // ── Shared API response cache (Perenual plant data) ─────────────────────
+    // F0.3 partial hardening: any authenticated user may still write (the app
+    // caches from the client via CatalogService), but writes must match the
+    // cache shape and may only land under the two known subtrees. This blocks
+    // arbitrary-garbage bloat. NOTE: it does NOT stop a well-formed cache
+    // *poisoning* — closing that requires moving writes behind a Cloud Function
+    // that proxies Perenual, which is an app+CF change, not a rules-only one.
     "cached": {
       ".read":  "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null",
+      "plants": {
+        "$perenualId": {
+          ".validate": "newData.child('cached_at').isNumber() && newData.hasChild('data')"
+        }
+      },
+      "care_guides": {
+        "$perenualId": {
+          ".validate": "newData.child('cached_at').isNumber() && newData.hasChild('sections')"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
     }
   }
 }
