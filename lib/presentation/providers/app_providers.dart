@@ -15,11 +15,13 @@ import '../../core/services/weather_service.dart';
 import '../../core/utils/units.dart';
 import '../../core/services/calibration_service.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/services/device_info_service.dart';
 import '../../domain/repositories/sensor_repository.dart';
 import '../../domain/repositories/plant_repository.dart';
 import '../../data/repositories/sensor_repository_impl.dart';
 import '../../data/repositories/plant_repository_impl.dart';
 import '../../models/linked_device.dart';
+import '../../models/device_info.dart';
 import '../../models/sensor_data.dart';
 import '../../models/plant_profile.dart';
 import '../../models/pump_schedule.dart';
@@ -81,6 +83,24 @@ final scheduleServiceProvider = Provider<ScheduleService?>((ref) {
   final ctx = ref.watch(deviceContextProvider).value;
   if (ctx == null) return null;
   return ScheduleService(esp32Id: ctx.esp32Id);
+});
+
+/// Reads the active device's declared capabilities (`devices/{id}/info/`).
+/// Null in demo mode or before a device is linked.
+final deviceInfoServiceProvider = Provider<DeviceInfoService?>((ref) {
+  if (kDemoMode) return null;
+  final ctx = ref.watch(deviceContextProvider).value;
+  if (ctx == null) return null;
+  return DeviceInfoService(esp32Id: ctx.esp32Id);
+});
+
+/// Live capability model for the active device. Emits an empty [DeviceInfo]
+/// (isEmpty == true) in demo mode, before a device is linked, or when the
+/// device hasn't published `info/` yet — consumers then show everything.
+final deviceInfoProvider = StreamProvider<DeviceInfo>((ref) {
+  final service = ref.watch(deviceInfoServiceProvider);
+  if (service == null) return Stream.value(const DeviceInfo());
+  return service.infoStream;
 });
 
 final deviceServiceProvider = Provider<DeviceService>((ref) {
