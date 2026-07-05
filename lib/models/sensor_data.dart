@@ -1,5 +1,7 @@
 class SensorData {
   final double? temperatura;
+  final double? humedadSuelo; // Humedad volumétrica del suelo (%) — cultivo en tierra
+  final double? humedadAire; // Humedad ambiente relativa (%HR) — DHT22
   final double? nivelAguaTanque; // Nivel de agua en tanque (%)
   final double? nivelFertilizanteTanque; // Nivel de fertilizante en tanque (%)
   final double? ph; // pH del agua
@@ -38,6 +40,8 @@ class SensorData {
 
   SensorData({
     this.temperatura,
+    this.humedadSuelo,
+    this.humedadAire,
     this.nivelAguaTanque,
     this.nivelFertilizanteTanque,
     this.ph,
@@ -62,6 +66,10 @@ class SensorData {
   factory SensorData.fromMap(Map<dynamic, dynamic> map) {
     return SensorData(
       temperatura: (map['temperatura'] as num?)?.toDouble() ?? 0.0,
+      // Null (not 0.0) when the key is absent, so the UI can tell "no soil
+      // sensor on this device" apart from a genuine 0 % reading.
+      humedadSuelo: (map['humedad_suelo'] as num?)?.toDouble(),
+      humedadAire: (map['humedad_aire'] as num?)?.toDouble(),
       nivelAguaTanque: (map['nivel_agua_tanque'] as num?)?.toDouble() ?? 0.0,
       nivelFertilizanteTanque:
           (map['nivel_fertilizante_tanque'] as num?)?.toDouble() ?? 0.0,
@@ -106,6 +114,8 @@ class SensorData {
       identical(this, other) ||
       other is SensorData &&
           temperatura == other.temperatura &&
+          humedadSuelo == other.humedadSuelo &&
+          humedadAire == other.humedadAire &&
           ph == other.ph &&
           conductividad == other.conductividad &&
           nivelAguaTanque == other.nivelAguaTanque &&
@@ -126,8 +136,8 @@ class SensorData {
           dosificadoraBaseManualOverride == other.dosificadoraBaseManualOverride;
 
   @override
-  int get hashCode => Object.hash(
-        temperatura, ph, conductividad,
+  int get hashCode => Object.hashAll([
+        temperatura, humedadSuelo, humedadAire, ph, conductividad,
         nivelAguaTanque, nivelFertilizanteTanque,
         nivelAgua, conectado,
         bombaAgua, bombaFertilizante,
@@ -136,11 +146,13 @@ class SensorData {
         dosificadoraAcidoAuto, dosificadoraBaseAuto,
         bombaAguaManualOverride, bombaFertilizanteManualOverride,
         dosificadoraAcidoManualOverride, dosificadoraBaseManualOverride,
-      );
+      ]);
 
   Map<String, dynamic> toMap() {
     return {
       'temperatura': temperatura,
+      'humedad_suelo': humedadSuelo,
+      'humedad_aire': humedadAire,
       'nivel_agua_tanque': nivelAguaTanque,
       'nivel_fertilizante_tanque': nivelFertilizanteTanque,
       'ph': ph,
