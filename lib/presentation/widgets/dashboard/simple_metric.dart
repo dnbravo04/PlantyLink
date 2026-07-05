@@ -143,12 +143,30 @@ class SimpleMetricsGrid extends StatelessWidget {
           icon: Icons.eco_outlined,
           isInRange: fertInRange,
         ),
+        // Cultivo en tierra: solo si el dispositivo reporta humedad de suelo.
+        if (sensor.humedadSuelo != null) ...[
+          const SizedBox(height: 8),
+          SimpleMetric(
+            label: 'Humedad de suelo',
+            value: '${sensor.humedadSuelo!.toStringAsFixed(0)}%',
+            icon: Icons.grass_outlined,
+            isInRange: _isSoilInRange(sensor.humedadSuelo!, profile),
+          ),
+        ],
       ],
     );
   }
 
   bool _isTempInRange(double temp) {
     return temp >= 15 && temp <= 30;
+  }
+
+  bool _isSoilInRange(double soil, PlantProfile? profile) {
+    final min = profile?.humedadSueloMin;
+    final max = profile?.humedadSueloMax;
+    if (min != null && soil < min) return false;
+    if (max != null && soil > max) return false;
+    return true;
   }
 
   bool _isPhInRange(double ph, PlantProfile? profile) {
