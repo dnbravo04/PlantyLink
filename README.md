@@ -145,24 +145,19 @@ lib/
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com).
 2. Enable **Realtime Database** (start in locked mode).
-3. Apply the security rules in `firebase_rules.json` (if present) or use:
+3. Deploy the security rules that ship with the repo (`database.rules.json`):
 
-```json
-{
-  "rules": {
-    "usuarios": {
-      "$uid": {
-        ".read": "$uid === auth.uid",
-        ".write": "$uid === auth.uid"
-      }
-    },
-    "sensores": {
-      ".read": "auth != null",
-      ".write": false
-    }
-  }
-}
+```bash
+firebase deploy --only database
 ```
+
+   The schema is **device-scoped**, not a single global `sensores` node. Live
+   readings live at `devices/{esp32Id}/sensors`, actuator commands at
+   `devices/{esp32Id}/controls`, and per-user data (including the active
+   `esp32_id` pointer and the multi-device registry) under `usuarios/{uid}`.
+   A device node is readable/writable only by a user who has that `esp32Id`
+   linked. See `database.rules.json` for the authoritative definition and
+   `docs/AUDITORIA_FIRMWARE_HARDWARE.md` for the full RTDB layout.
 
 4. Download `google-services.json` (Android) → place at `android/app/google-services.json`
 5. Download `GoogleService-Info.plist` (iOS) → place at `ios/Runner/GoogleService-Info.plist`
