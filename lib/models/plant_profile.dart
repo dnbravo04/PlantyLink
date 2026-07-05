@@ -6,6 +6,11 @@ class PlantProfile {
   final double ecMin, ecMax;
   final double nivelAguaMin;
   final double nivelFertilizanteMin;
+  // ── Cultivo en tierra (soil-first, ROADMAP_PRODUCTO.md P1) ─────────────────
+  // Opcionales: null en perfiles hidropónicos, que no miden humedad de suelo.
+  final double? humedadSueloMin; // % — umbral bajo de humedad de suelo
+  final double? humedadSueloMax; // % — umbral alto (opcional)
+  final String tipoCultivo; // 'suelo' | 'hidroponico'
   final String fuente;
 
   const PlantProfile({
@@ -19,6 +24,9 @@ class PlantProfile {
     required this.ecMax,
     required this.nivelAguaMin,
     required this.nivelFertilizanteMin,
+    this.humedadSueloMin,
+    this.humedadSueloMax,
+    this.tipoCultivo = 'hidroponico',
     required this.fuente,
   });
 
@@ -35,6 +43,9 @@ class PlantProfile {
       nivelAguaMin: (map['nivel_agua_min'] as num?)?.toDouble() ?? 20.0,
       nivelFertilizanteMin:
           (map['nivel_fertilizante_min'] as num?)?.toDouble() ?? 20.0,
+      humedadSueloMin: (map['humedad_suelo_min'] as num?)?.toDouble(),
+      humedadSueloMax: (map['humedad_suelo_max'] as num?)?.toDouble(),
+      tipoCultivo: map['tipo_cultivo'] as String? ?? 'hidroponico',
       fuente: map['fuente'] as String? ?? '',
     );
   }
@@ -50,6 +61,9 @@ class PlantProfile {
     'ec_max': ecMax,
     'nivel_agua_min': nivelAguaMin,
     'nivel_fertilizante_min': nivelFertilizanteMin,
+    'humedad_suelo_min': humedadSueloMin,
+    'humedad_suelo_max': humedadSueloMax,
+    'tipo_cultivo': tipoCultivo,
     'fuente': fuente,
   };
 }
@@ -594,4 +608,73 @@ class PlantCatalog {
       fuente: 'Flora tropical colombiana; estimado',
     ),
   ];
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CULTIVO EN TIERRA (soil-first — ROADMAP_PRODUCTO.md P1)
+  // ═══════════════════════════════════════════════════════════════════════
+  // Estas plantas se monitorean por humedad de suelo (%), no por EC/nivel de
+  // tanque. Los rangos son de referencia horticultural general — NO provienen
+  // de un estudio citado como los perfiles hidropónicos; deben validarse con
+  // una fuente agronómica antes de producción.
+  static const List<PlantProfile> plantasSuelo = [
+    PlantProfile(
+      nombre: 'Albahaca (tierra)',
+      emoji: '🌿',
+      tempMin: 18, tempMax: 30,
+      phMin: 6.0, phMax: 7.5,
+      ecMin: 0, ecMax: 0,
+      nivelAguaMin: 0, nivelFertilizanteMin: 0,
+      humedadSueloMin: 40, humedadSueloMax: 70,
+      tipoCultivo: 'suelo',
+      fuente: 'Rango general de referencia — validar con fuente agronómica',
+    ),
+    PlantProfile(
+      nombre: 'Menta (tierra)',
+      emoji: '🌱',
+      tempMin: 15, tempMax: 28,
+      phMin: 6.0, phMax: 7.0,
+      ecMin: 0, ecMax: 0,
+      nivelAguaMin: 0, nivelFertilizanteMin: 0,
+      humedadSueloMin: 50, humedadSueloMax: 75,
+      tipoCultivo: 'suelo',
+      fuente: 'Rango general de referencia — validar con fuente agronómica',
+    ),
+    PlantProfile(
+      nombre: 'Tomate (tierra)',
+      emoji: '🍅',
+      tempMin: 18, tempMax: 28,
+      phMin: 6.0, phMax: 6.8,
+      ecMin: 0, ecMax: 0,
+      nivelAguaMin: 0, nivelFertilizanteMin: 0,
+      humedadSueloMin: 45, humedadSueloMax: 70,
+      tipoCultivo: 'suelo',
+      fuente: 'Rango general de referencia — validar con fuente agronómica',
+    ),
+    PlantProfile(
+      nombre: 'Fresa (tierra)',
+      emoji: '🍓',
+      tempMin: 15, tempMax: 26,
+      phMin: 5.5, phMax: 6.8,
+      ecMin: 0, ecMax: 0,
+      nivelAguaMin: 0, nivelFertilizanteMin: 0,
+      humedadSueloMin: 50, humedadSueloMax: 70,
+      tipoCultivo: 'suelo',
+      fuente: 'Rango general de referencia — validar con fuente agronómica',
+    ),
+    PlantProfile(
+      nombre: 'Suculenta / Cactus',
+      emoji: '🌵',
+      tempMin: 18, tempMax: 32,
+      phMin: 6.0, phMax: 7.5,
+      ecMin: 0, ecMax: 0,
+      nivelAguaMin: 0, nivelFertilizanteMin: 0,
+      humedadSueloMin: 10, humedadSueloMax: 30,
+      tipoCultivo: 'suelo',
+      fuente: 'Rango general de referencia — validar con fuente agronómica',
+    ),
+  ];
+
+  /// Todos los perfiles (hidropónicos + suelo). El selector filtra por
+  /// [PlantProfile.tipoCultivo] según el dispositivo activo.
+  static List<PlantProfile> get todas => [...plantas, ...plantasSuelo];
 }

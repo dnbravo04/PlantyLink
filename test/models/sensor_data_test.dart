@@ -68,6 +68,24 @@ void main() {
       expect(sensor.temperatura, 25.0);
       expect(sensor.ph, 7.0);
     });
+
+    test('parses humedad_suelo and humedad_aire (soil-first fields)', () {
+      final sensor = SensorData.fromMap({
+        'humedad_suelo': 42.5,
+        'humedad_aire': 61.0,
+      });
+
+      expect(sensor.humedadSuelo, 42.5);
+      expect(sensor.humedadAire, 61.0);
+    });
+
+    test('leaves soil/air humidity null when absent (distinguishes no-sensor '
+        'from a 0% reading)', () {
+      final sensor = SensorData.fromMap({'temperatura': 20.0});
+
+      expect(sensor.humedadSuelo, isNull);
+      expect(sensor.humedadAire, isNull);
+    });
   });
 
   group('SensorData.toMap', () {
@@ -104,6 +122,19 @@ void main() {
       expect(restored.bombaAgua, original.bombaAgua);
       expect(restored.bombaFertilizante, original.bombaFertilizante);
       expect(restored.timestamp, original.timestamp);
+    });
+
+    test('round-trips humedad_suelo/humedad_aire', () {
+      final original = SensorData(
+        humedadSuelo: 55.0,
+        humedadAire: 48.0,
+        timestamp: DateTime.fromMillisecondsSinceEpoch(1700000000000),
+      );
+
+      final restored = SensorData.fromMap(original.toMap());
+
+      expect(restored.humedadSuelo, 55.0);
+      expect(restored.humedadAire, 48.0);
     });
   });
 

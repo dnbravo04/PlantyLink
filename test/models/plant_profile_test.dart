@@ -101,6 +101,59 @@ void main() {
     });
   });
 
+  group('PlantProfile soil fields (soil-first)', () {
+    test('defaults tipoCultivo to hidroponico and soil thresholds to null', () {
+      final p = PlantProfile.fromMap({});
+      expect(p.tipoCultivo, 'hidroponico');
+      expect(p.humedadSueloMin, isNull);
+      expect(p.humedadSueloMax, isNull);
+    });
+
+    test('parses soil thresholds and tipo_cultivo', () {
+      final p = PlantProfile.fromMap({
+        'tipo_cultivo': 'suelo',
+        'humedad_suelo_min': 40.0,
+        'humedad_suelo_max': 70.0,
+      });
+      expect(p.tipoCultivo, 'suelo');
+      expect(p.humedadSueloMin, 40.0);
+      expect(p.humedadSueloMax, 70.0);
+    });
+
+    test('round-trips soil fields through toMap', () {
+      const original = PlantProfile(
+        nombre: 'Albahaca', emoji: '🌿',
+        tempMin: 18, tempMax: 30, phMin: 6, phMax: 7.5,
+        ecMin: 0, ecMax: 0, nivelAguaMin: 0, nivelFertilizanteMin: 0,
+        humedadSueloMin: 40, humedadSueloMax: 70,
+        tipoCultivo: 'suelo', fuente: 'test',
+      );
+      final restored = PlantProfile.fromMap(original.toMap());
+      expect(restored.humedadSueloMin, 40);
+      expect(restored.humedadSueloMax, 70);
+      expect(restored.tipoCultivo, 'suelo');
+    });
+  });
+
+  group('PlantCatalog.plantasSuelo', () {
+    test('soil plants are tipoCultivo suelo with valid moisture ranges', () {
+      expect(PlantCatalog.plantasSuelo, isNotEmpty);
+      for (final p in PlantCatalog.plantasSuelo) {
+        expect(p.tipoCultivo, 'suelo', reason: p.nombre);
+        expect(p.humedadSueloMin, isNotNull, reason: p.nombre);
+        expect(p.humedadSueloMax, isNotNull, reason: p.nombre);
+        expect(p.humedadSueloMin!, lessThan(p.humedadSueloMax!),
+            reason: '${p.nombre}: humedadSueloMin should be < max');
+        expect(p.tempMin, lessThan(p.tempMax), reason: p.nombre);
+      }
+    });
+
+    test('todas combines hydroponic and soil catalogs', () {
+      expect(PlantCatalog.todas.length,
+          PlantCatalog.plantas.length + PlantCatalog.plantasSuelo.length);
+    });
+  });
+
   group('PlantCatalog', () {
     test('contains at least 5 built-in plants', () {
       expect(PlantCatalog.plantas.length, greaterThanOrEqualTo(5));
