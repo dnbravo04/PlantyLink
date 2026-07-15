@@ -20,15 +20,15 @@ class ControlService {
 
   /// Set [pumpKey] (e.g. `bomba_agua`) to [active].
   ///
-  /// Writes to both `controls/` (ESP32 reads this) and `sensors/` (app UI
-  /// reads this), so the button state flips immediately without waiting for
-  /// the ESP32 to echo the value back.
+  /// Writes **only** to `controls/` — the app's exclusive node. The firmware
+  /// owns `sensors/` and echoes the applied value back there once it acts, so
+  /// the UI reflects confirmed hardware state rather than an optimistic guess.
+  /// Until that echo lands, the button shows a pending state
+  /// (see `PumpCommandsNotifier`). This node-ownership split (app→`controls/`,
+  /// firmware→`sensors/`) removes the double-writer race on `sensors/`.
   Future<void> setPump(String pumpKey, bool active) {
     return RetryPolicy.execute(
-      () => _db.ref('devices/$esp32Id').update({
-        'controls/$pumpKey': active,
-        'sensors/$pumpKey': active,
-      }),
+      () => _db.ref('devices/$esp32Id/controls/$pumpKey').set(active),
     );
   }
 

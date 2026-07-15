@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -395,3 +396,94 @@ final schedulesProvider = StreamProvider<List<PumpSchedule>>((ref) {
   if (service == null) return Stream.value([]);
   return service.schedulesStream;
 });
+
+// ── Pump commands (node-ownership: app → controls/, firmware → sensors/) ──────
+
+/// How long a pump command stays "pending" without a firmware echo before the
+/// UI gives up and reverts to the last confirmed state. Overridable in tests.
+final pumpConfirmTimeoutProvider =
+    Provider<Duration>((ref) => const Duration(seconds: 8));
+
+/// Reads a pump's confirmed state (from `sensors/`) for the given command key.
+bool? _sensorPumpValue(SensorData s, String pumpId) {
+  switch (pumpId) {
+    case 'bomba_agua':
+      return s.bombaAgua;
+    case 'bomba_fertilizante':
+      return s.bombaFertilizante;
+    case 'bomba_dosificadora_acido':
+      return s.bombaDosificadoraAcido;
+    case 'bomba_dosificadora_basico':
+      return s.bombaDosificadoraBasico;
+    default:
+      return null;
+  }
+}
+
+/// Tracks pump commands that have been sent to `controls/` but not yet
+/// confirmed by the firmware via `sensors/`.
+///
+/// The app no longer echoes actuator state into `sensors/` (that node belongs
+/// to the firmware). To keep the button responsive, [send] records the desired
+/// value as *pending* and the notifier clears it when a fresh sensor snapshot
+/// reports the commanded value — or after [pumpConfirmTimeoutProvider] elapses,
+/// so a lost command can't leave the button stuck forever.
+///
+/// State maps `pumpId → desiredValue` and only contains currently-pending pumps.
+class PumpCommandsNotifier extends Notifier<Map<String, bool>> {
+  final Map<String, Timer> _timers = {};
+
+  @override
+  Map<String, bool> build() {
+    // Clear pending flags as the firmware confirms each command.
+    ref.listen(sensorProvider, (_, next) => _reconcile(next.value));
+    ref.onDispose(() {
+      for (final t in _timers.values) {
+        t.cancel();
+      }
+      _timers.clear();
+    });
+    return const {};
+  }
+
+  /// Whether [pumpId] is waiting on a firmware confirmation.
+  bool isPending(String pumpId) => state.containsKey(pumpId);
+
+  /// Send a pump command: write to `controls/` and mark it pending until the
+  /// firmware echoes it back on `sensors/` (or the confirm timeout fires).
+  Future<void> send(String pumpId, bool active) async {
+    _timers.remove(pumpId)?.cancel();
+    state = {...state, pumpId: active};
+    final timeout = ref.read(pumpConfirmTimeoutProvider);
+    _timers[pumpId] = Timer(timeout, () => _clear(pumpId));
+    try {
+      await ref.read(sensorRepositoryProvider)?.togglePump(pumpId, active);
+    } catch (_) {
+      // Failed to enqueue — drop the pending flag so the button reflects the
+      // real (unchanged) state and the user can retry.
+      _clear(pumpId);
+      rethrow;
+    }
+  }
+
+  void _reconcile(SensorData? sensor) {
+    if (sensor == null || state.isEmpty) return;
+    for (final entry in state.entries.toList()) {
+      if (_sensorPumpValue(sensor, entry.key) == entry.value) {
+        _clear(entry.key);
+      }
+    }
+  }
+
+  void _clear(String pumpId) {
+    _timers.remove(pumpId)?.cancel();
+    if (!state.containsKey(pumpId)) return;
+    state = {...state}..remove(pumpId);
+  }
+}
+
+/// Pump commands awaiting firmware confirmation (`pumpId → desiredValue`).
+/// The dashboard watches this to show a pending state on actuator buttons.
+final pumpCommandsProvider =
+    NotifierProvider<PumpCommandsNotifier, Map<String, bool>>(
+        PumpCommandsNotifier.new);
