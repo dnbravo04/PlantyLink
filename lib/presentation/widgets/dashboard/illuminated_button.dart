@@ -122,7 +122,10 @@ class _IlluminatedButtonState extends State<IlluminatedButton>
                     ),
                   )
                 : Row(
-                    mainAxisSize: MainAxisSize.min,
+                    // Center the content so a single full-width button (e.g.
+                    // just "Regar ahora" on a soil device) isn't left-hugging
+                    // with an empty right half.
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Transform.rotate(
                         angle: iconAngle,
