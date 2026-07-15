@@ -339,7 +339,7 @@ function App() {
             </p>
             <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-3xl max-w-md mx-auto">
               <p className="text-planty-light font-semibold mb-4">Versión actual: v1.0 (Julio 2026)</p>
-              <a href="/downloads/plantylink-v1.0.apk" className="block w-full bg-planty hover:bg-planty-dark text-white py-4 rounded-xl font-bold text-lg transition mb-4 shadow-[0_0_20px_rgba(5,150,105,0.4)] hover:shadow-[0_0_30px_rgba(5,150,105,0.6)] hover:-translate-y-1">
+              <a href="/downloads/PlantyLink.apk" className="block w-full bg-planty hover:bg-planty-dark text-white py-4 rounded-xl font-bold text-lg transition mb-4 shadow-[0_0_20px_rgba(5,150,105,0.4)] hover:shadow-[0_0_30px_rgba(5,150,105,0.6)] hover:-translate-y-1">
                 Descargar APK (Android)
               </a>
               <p className="text-sm text-gray-400">Requiere Android 5.0 (API 21) o superior</p>

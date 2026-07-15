@@ -1,186 +1,186 @@
 /**
- * PlantyLink — Firmware ESP32 · Prototipo mínimo para demo (2026-07-15)
- * =====================================================================
- *
- * Implementa exactamente el contrato que la app Flutter ya espera en
- * Firebase Realtime Database (ver lib/core/services/*.dart):
- *
- *   LEE   devices/{DEVICE_ID}/controls/bomba_agua         (bool, escrito por la app)
- *   LEE   devices/{DEVICE_ID}/controls/riego_automatico   (bool, escrito por la app)
- *   ESCRIBE devices/{DEVICE_ID}/sensors/                  (cada PUBLISH_INTERVAL_MS)
- *       temperatura        °C            ← DHT22
- *       humedad_aire       %HR           ← DHT22            (la app la muestra, F0.2)
- *       humedad_suelo      %             ← sensor capacitivo (la app la muestra, F0.2)
- *       nivel_agua_tanque  %             ← humedad_suelo, SOLO si MAP_SOIL_TO_TANK=1 (shim, ahora 0)
- *       bomba_agua         bool          ← estado real del relé
- *       conectado          true
- *       timestamp          epoch ms      ← ServerValue.timestamp (hora del servidor RTDB)
- *   ESCRIBE devices/{DEVICE_ID}/info/                     (una vez, al arrancar)
- *       modelo_hardware, version_firmware, tipo_cultivo, sensores{}, actuadores{}
- *       → modelo de capacidades (P1): la app muestra solo lo que este equipo tiene
- *
- * La app marca los datos como "stale" si timestamp tiene más de 10 s
- * (SensorStreamService.staleDataStream) → publicamos cada 5 s.
- *
- * Autenticación: las reglas (database.rules.json) exigen auth != null y que
- * usuarios/{auth.uid}/esp32_id == DEVICE_ID. Este firmware inicia sesión con
- * una "cuenta de dispositivo" (email/contraseña creada en Firebase Auth) y se
- * auto-registra escribiendo usuarios/{su_uid}/esp32_id = DEVICE_ID al arrancar
- * (permitido por las reglas: cada cuenta escribe su propio nodo usuarios/).
- *
- * NO implementado (pendiente explícito, no crítico para la demo):
- *   - NFC en firmware: no hace falta. El emparejamiento NFC lo hace el
- *     teléfono leyendo el UID de un tag pasivo (sticker NTAG) pegado a la caja.
- *   - bomba_fertilizante / dosificadoras ácido-base (se registran por Serial).
- *   - schedules/ (horarios de riego) y calibration/ (pH/EC: no hay sensores).
- *   - Sensores de pH, EC y niveles de tanque reales.
- *
- * Placa:      ESP32 DevKit (WROOM-32)
- * Librerías (Arduino IDE → Library Manager):
- *   - "Firebase Arduino Client Library for ESP8266 and ESP32" (mobizt) v4.4.x
- *   - "DHT sensor library" (Adafruit) + "Adafruit Unified Sensor"
- */
+ * PlantyLink — Firmware
+*/
 
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
-#include <DHT.h>
-#include "addons/TokenHelper.h" // tokenStatusCallback
-#include "addons/RTDBHelper.h"  // ayudas de impresión RTDB
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
 
 // ─── Configuración: EDITAR ANTES DE FLASHEAR ─────────────────────────────────
-#define WIFI_SSID       "TU_SSID"
-#define WIFI_PASSWORD   "TU_PASSWORD"
+#define WIFI_SSID       "REDACTED_WIFI_SSID"
+#define WIFI_PASSWORD   "REDACTED_WIFI_PASSWORD"
 
-// Firebase console → Configuración del proyecto → General → "Clave de API web"
-#define API_KEY         "TU_WEB_API_KEY"
-#define DATABASE_URL    "https://hydrotrack-13047.firebaseio.com" // = lib/core/firebase_constants.dart
+#define API_KEY         "AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU"
+#define DATABASE_URL    "https://hydrotrack-13047.firebaseio.com"
 
-// Cuenta de dispositivo: crearla UNA vez en Firebase console → Authentication
-// → Users → Add user (proveedor email/contraseña habilitado).
 #define DEVICE_EMAIL    "esp32-01@plantylink.device"
-#define DEVICE_PASSWORD "CAMBIAR_ESTA_CLAVE"
+#define DEVICE_PASSWORD "REDACTED_DEVICE_PASSWORD"
 
-// Debe coincidir EXACTAMENTE con el ID que se vincula en la app (QR, manual o
-// UID del tag NFC). Formato válido según la app: ^[a-zA-Z0-9][a-zA-Z0-9:\-_]{2,63}$
 #define DEVICE_ID       "pl-esp32-01"
 
-// Shim de demo (F0.2: RESUELTO). La app ya tiene tarjeta propia de humedad de
-// suelo, así que dejamos de prestar el campo nivel_agua_tanque. Poner a 1 solo
-// para demos con una versión antigua de la app que no muestra humedad_suelo.
-#define MAP_SOIL_TO_TANK 0
-
-// Identidad/capacidades publicadas en devices/{id}/info al arrancar.
-#define FW_VERSION      "0.1.0-demo"
-#define HW_MODEL        "esp32-soil-v1"
+#define FW_VERSION      "0.2.0-demo-ingenia"
+#define HW_MODEL        "esp32-demo-v1"
 
 // ─── Pines ───────────────────────────────────────────────────────────────────
-// GPIO 4 : DHT22 (digital). Sin conflicto con WiFi.
-// GPIO 34: sensor de humedad de suelo (ADC1_CH6). OBLIGATORIO usar ADC1
-//          (GPIO 32-39): los pines ADC2 no funcionan con WiFi activo.
-//          GPIO 34 es solo-entrada, ideal para un sensor analógico.
-// GPIO 26: relé de la bomba. No es pin de strapping (evitamos 0/2/12/15) y no
-//          genera pulsos en el arranque.
-#define PIN_DHT        4
-#define PIN_SOIL       34
-#define PIN_RELAY_PUMP 26
-#define PIN_LED_STATUS 2   // LED azul onboard: encendido = Firebase listo
+#define PIN_PROBE       34   // ADC1_CH6 · solo-entrada · ADC1 obligatorio con WiFi
+#define PIN_PUMP_LED    2    // LED azul onboard = estado de la bomba
+#define PIN_PUMP_EXT    26   // LED externo opcional (mismo estado)
 
-// La mayoría de módulos de relé de 1 canal con optoacoplador son activos en LOW.
-#define RELAY_ACTIVE_LOW 1
+// ─── Sonda ───────────────────────────────────────────────────────────────────
+#define R_FIXED         10000.0f   // resistencia del divisor (la de 10 kΩ)
+#define ADC_MAX         4095.0f
 
-// ─── Calibración del sensor de suelo (capacitivo v1.2 @ 3.3 V, ADC 12 bits) ──
-// Medir y ajustar: valor crudo con el sensor al aire (seco) y sumergido (agua).
-#define SOIL_RAW_AIR   3200
-#define SOIL_RAW_WATER 1300
+// Parámetros del NTC 10k (valores típicos; ajustables si hay tiempo de calibrar)
+#define NTC_R0          10000.0f   // resistencia nominal a 25 °C
+#define NTC_T0_K        298.15f    // 25 °C en kelvin
+#define NTC_BETA        3950.0f    // constante Beta típica de estas sondas
+
+// Rangos de decisión de la auto-detección
+#define PROBE_NTC_MIN   4000.0f
+#define PROBE_NTC_MAX   40000.0f
+#define PROBE_OPEN_MIN  100000.0f
+
+enum ProbeType { PROBE_NTC, PROBE_PT100, PROBE_NONE };
+ProbeType probeType = PROBE_NONE;
 
 // ─── Temporización ───────────────────────────────────────────────────────────
-#define PUBLISH_INTERVAL_MS 5000UL   // < 10 s (umbral stale de la app)
+#define PUBLISH_INTERVAL_MS 2000UL   // muy por debajo del umbral stale (10 s) de la app
+#define SIM_TICK_MS         250UL    // paso de integración de la simulación
 
-// Riego automático (controls/riego_automatico == true):
-#define AUTO_ON_BELOW_PCT   35.0f    // arranca ciclo si humedad_suelo < 35 %
-#define AUTO_RUN_MS         8000UL   // bomba encendida 8 s por ciclo
-#define AUTO_COOLDOWN_MS    60000UL  // mínimo 60 s entre ciclos
+// ─── Riego automático ────────────────────────────────────────────────────────
+#define AUTO_ON_BELOW_PCT   35.0f
+#define AUTO_RUN_MS         8000UL
+#define AUTO_COOLDOWN_MS    30000UL  // reducido a 30 s: en la expo el jurado no espera 1 min
+
+// ─── Modelo de simulación del suelo ──────────────────────────────────────────
+// El suelo se seca solo, y se humedece cuando la bomba está encendida.
+// Así el ciclo completo (baja → riega → sube → corta) se ve EN VIVO en la app.
+#define SOIL_START_PCT    55.0f
+#define SOIL_DRY_RATE     0.45f   // % por segundo que baja sin riego  (~45 s para llegar a 35 %)
+#define SOIL_WET_RATE     3.50f   // % por segundo que sube con la bomba encendida
+#define SOIL_MIN_PCT      8.0f
+#define SOIL_MAX_PCT      92.0f
 
 // ─── Estado global ───────────────────────────────────────────────────────────
-DHT dht(PIN_DHT, DHT22);
-
-FirebaseData   fbdo;      // operaciones puntuales (set/update)
-FirebaseData   fbStream;  // stream de controls/
+FirebaseData   fbdo;
+FirebaseData   fbStream;
 FirebaseAuth   fbAuth;
 FirebaseConfig fbConfig;
 
-const String kBasePath    = String("devices/") + DEVICE_ID;
-const String kSensorsPath = kBasePath + "/sensors";
+const String kBasePath     = String("devices/") + DEVICE_ID;
+const String kSensorsPath  = kBasePath + "/sensors";
 const String kControlsPath = kBasePath + "/controls";
 
-bool manualPumpCmd   = false; // controls/bomba_agua (orden de la app)
-bool autoMode        = false; // controls/riego_automatico
+bool manualPumpCmd   = false;
+bool autoMode        = false;
 bool autoCycleActive = false;
-bool relayState      = false; // estado real aplicado al relé
+bool pumpState       = false;
 
 unsigned long autoCycleStartMs = 0;
 unsigned long lastAutoCycleEnd = 0;
 unsigned long lastPublishMs    = 0;
+unsigned long lastSimTickMs    = 0;
 
-float lastSoilPct = -1; // -1 = sin lectura válida aún
+float soilPct = SOIL_START_PCT;
 
-// ─── Relé ────────────────────────────────────────────────────────────────────
-void applyRelay(bool on) {
-#if RELAY_ACTIVE_LOW
-  digitalWrite(PIN_RELAY_PUMP, on ? LOW : HIGH);
-#else
-  digitalWrite(PIN_RELAY_PUMP, on ? HIGH : LOW);
-#endif
-  relayState = on;
+// ─── Actuador (LED en lugar del relé) ────────────────────────────────────────
+void applyPump(bool on) {
+  digitalWrite(PIN_PUMP_LED, on ? HIGH : LOW);
+  digitalWrite(PIN_PUMP_EXT, on ? HIGH : LOW);
+  pumpState = on;
   Serial.printf("[BOMBA] %s\n", on ? "ON" : "OFF");
 }
 
-// Refleja el estado real de la bomba en sensors/bomba_agua para que el botón
-// de la app quede sincronizado (la app lee sensors/, no controls/).
 void echoPumpState() {
   if (!Firebase.ready()) return;
-  Firebase.RTDB.setBoolAsync(&fbdo, kSensorsPath + "/bomba_agua", relayState);
+  Firebase.RTDB.setBoolAsync(&fbdo, kSensorsPath + "/bomba_agua", pumpState);
 }
 
-// ─── Sensores ────────────────────────────────────────────────────────────────
-float readSoilPct() {
+// ─── Lectura cruda de la sonda ───────────────────────────────────────────────
+float readProbeOhms() {
   uint32_t acc = 0;
-  for (int i = 0; i < 8; i++) {
-    acc += analogRead(PIN_SOIL);
-    delay(3);
+  for (int i = 0; i < 32; i++) {
+    acc += analogRead(PIN_PROBE);
+    delay(2);
   }
-  int raw = acc / 8;
-  float pct = 100.0f * (SOIL_RAW_AIR - raw) / float(SOIL_RAW_AIR - SOIL_RAW_WATER);
-  return constrain(pct, 0.0f, 100.0f);
+  float raw = acc / 32.0f;
+  if (raw >= ADC_MAX - 1.0f) return 1.0e9f;   // circuito abierto
+  if (raw <= 1.0f)           return 0.0f;     // cortocircuito a GND
+  return R_FIXED * raw / (ADC_MAX - raw);
+}
+
+void detectProbe() {
+  float r = readProbeOhms();
+  Serial.printf("[SONDA] R medida ≈ %.0f ohm\n", r);
+
+  if (r >= PROBE_NTC_MIN && r <= PROBE_NTC_MAX) {
+    probeType = PROBE_NTC;
+    Serial.println("[SONDA] Detectada: NTC 10k → TEMPERATURA REAL habilitada");
+  } else if (r > 0.0f && r < 1000.0f) {
+    probeType = PROBE_PT100;
+    Serial.println("[SONDA] Detectada: PT100 (2 hilos) → resolución insuficiente sin");
+    Serial.println("        amplificador MAX31865 → TEMPERATURA SIMULADA");
+  } else {
+    probeType = PROBE_NONE;
+    Serial.println("[SONDA] No conectada o fuera de rango → TEMPERATURA SIMULADA");
+  }
+}
+
+// ─── Temperatura ─────────────────────────────────────────────────────────────
+float readTemperatureC() {
+  if (probeType == PROBE_NTC) {
+    float r = readProbeOhms();
+    if (r > 0.0f && r < 1.0e8f) {
+      // Ecuación Beta: 1/T = 1/T0 + (1/B) · ln(R/R0)
+      float invT = 1.0f / NTC_T0_K + (1.0f / NTC_BETA) * log(r / NTC_R0);
+      float tC = (1.0f / invT) - 273.15f;
+      if (tC > -20.0f && tC < 80.0f) return tC;
+    }
+  }
+  // Simulación: ambiente de invernadero, deriva lenta + ruido.
+  float base = 23.0f + 1.5f * sin(millis() / 45000.0f);
+  return base + (random(-30, 31) / 100.0f);
+}
+
+// ─── Humedad de aire (simulada: no hay DHT22) ────────────────────────────────
+// Ligada al suelo de forma plausible: suelo húmedo → aire algo más húmedo.
+float simulateAirHumidity() {
+  float base = 45.0f + 0.25f * soilPct;
+  return constrain(base + (random(-80, 81) / 100.0f), 30.0f, 90.0f);
+}
+
+// ─── Simulación de humedad de suelo ──────────────────────────────────────────
+void tickSoilSimulation(float dtSeconds) {
+  if (pumpState) {
+    soilPct += SOIL_WET_RATE * dtSeconds;
+  } else {
+    soilPct -= SOIL_DRY_RATE * dtSeconds;
+  }
+  soilPct += (random(-4, 5) / 100.0f);   // ruido de medición
+  soilPct = constrain(soilPct, SOIL_MIN_PCT, SOIL_MAX_PCT);
 }
 
 // ─── Publicación a RTDB ──────────────────────────────────────────────────────
 void publishSensors() {
-  float t = dht.readTemperature(); // °C
-  float h = dht.readHumidity();    // %HR
-  float soil = readSoilPct();
-  lastSoilPct = soil;
+  float t = readTemperatureC();
+  float h = simulateAirHumidity();
 
   FirebaseJson json;
-  if (!isnan(t)) json.set("temperatura", t);
-  if (!isnan(h)) json.set("humedad_aire", h);
-  json.set("humedad_suelo", soil);
-#if MAP_SOIL_TO_TANK
-  json.set("nivel_agua_tanque", soil);
-#endif
-  json.set("bomba_agua", relayState);
+  json.set("temperatura", t);
+  json.set("humedad_aire", h);
+  json.set("humedad_suelo", soilPct);
+  json.set("bomba_agua", pumpState);
   json.set("conectado", true);
 
   if (!Firebase.RTDB.updateNodeSilent(&fbdo, kSensorsPath, &json)) {
     Serial.printf("[RTDB] updateNode falló: %s\n", fbdo.errorReason().c_str());
     return;
   }
-  // Hora del servidor (epoch ms) — evita depender de NTP local y satisface el
-  // chequeo de staleness de la app (timestamp en milisegundos).
   Firebase.RTDB.setTimestamp(&fbdo, kSensorsPath + "/timestamp");
 
-  Serial.printf("[RTDB] pub ok  T=%.1f°C  HR=%.0f%%  suelo=%.0f%%  bomba=%d\n",
-                t, h, soil, relayState);
+  Serial.printf("[RTDB] pub ok  T=%.1f°C%s  HR=%.0f%%(sim)  suelo=%.0f%%(sim)  bomba=%d\n",
+                t, (probeType == PROBE_NTC ? "(real)" : "(sim)"), h, soilPct, pumpState);
 }
 
 // ─── Stream de controls/ ─────────────────────────────────────────────────────
@@ -191,16 +191,13 @@ void handleControlKey(const String &key, bool value) {
   } else if (key == "riego_automatico") {
     autoMode = value;
     Serial.printf("[CTRL] riego_automatico = %d\n", value);
-  } else if (key == "bomba_fertilizante" || key == "bomba_dosificadora_acido" ||
-             key == "bomba_dosificadora_basico") {
-    // Pendiente: sin hardware asignado en este prototipo.
-    Serial.printf("[CTRL] %s = %d (NO IMPLEMENTADO en este prototipo)\n",
-                  key.c_str(), value);
+  } else {
+    Serial.printf("[CTRL] %s = %d (sin hardware en este prototipo)\n", key.c_str(), value);
   }
 }
 
 void streamCallback(FirebaseStream data) {
-  const String path = data.dataPath(); // "/" (snapshot inicial) o "/<clave>"
+  const String path = data.dataPath();
   if (path == "/" && data.dataTypeEnum() == firebase_rtdb_data_type_json) {
     FirebaseJson *json = data.jsonObjectPtr();
     FirebaseJsonData item;
@@ -224,41 +221,46 @@ void selfRegister() {
 }
 
 // ─── Capacidades (modelo P1) → devices/{id}/info ─────────────────────────────
-// La app lee esto para mostrar SOLO los sensores/actuadores que este equipo
-// tiene, en vez de asumir el set hidropónico completo. Los sets se guardan como
-// mapas {clave: true} (RTDB desaconseja arrays).
+// Declaramos explícitamente qué es real y qué está simulado. Esto es honesto,
+// y además le da a la app la información para marcarlo en la UI si hace falta.
 void declareCapabilities() {
+  const bool tempReal = (probeType == PROBE_NTC);
+
   FirebaseJson info;
   info.set("modelo_hardware", HW_MODEL);
   info.set("version_firmware", FW_VERSION);
   info.set("tipo_cultivo", "suelo");
+  info.set("modo_demo", true);
+
   info.set("sensores/temperatura", true);
   info.set("sensores/humedad_aire", true);
   info.set("sensores/humedad_suelo", true);
   info.set("actuadores/bomba_agua", true);
+
+  info.set("sensores_simulados/temperatura", !tempReal);
+  info.set("sensores_simulados/humedad_aire", true);
+  info.set("sensores_simulados/humedad_suelo", true);
+  info.set("actuadores_simulados/bomba_agua", true);   // LED en lugar de relé+bomba
+
   Firebase.RTDB.updateNode(&fbdo, kBasePath + "/info", &info);
-  Serial.println("[INFO] capacidades declaradas en devices/" DEVICE_ID "/info");
+  Serial.println("[INFO] capacidades declaradas (modo_demo = true)");
 }
 
 // ─── Setup / Loop ────────────────────────────────────────────────────────────
 void setup() {
-  // Relé en reposo ANTES de configurar el pin: evita que la bomba arranque
-  // durante el boot (con módulos activos-LOW el pin flotante enciende el relé).
-#if RELAY_ACTIVE_LOW
-  digitalWrite(PIN_RELAY_PUMP, HIGH);
-#else
-  digitalWrite(PIN_RELAY_PUMP, LOW);
-#endif
-  pinMode(PIN_RELAY_PUMP, OUTPUT);
-  applyRelay(false);
-
-  pinMode(PIN_LED_STATUS, OUTPUT);
-  digitalWrite(PIN_LED_STATUS, LOW);
+  pinMode(PIN_PUMP_LED, OUTPUT);
+  pinMode(PIN_PUMP_EXT, OUTPUT);
+  applyPump(false);
 
   Serial.begin(115200);
-  dht.begin();
+  delay(500);
+  Serial.println("\n\n=== PlantyLink · firmware demo Ingenia Futuro ===");
+
+  randomSeed(esp_random());
+
   analogReadResolution(12);
-  analogSetPinAttenuation(PIN_SOIL, ADC_11db); // rango completo ~0-3.3 V
+  analogSetPinAttenuation(PIN_PROBE, ADC_11db);
+  detectProbe();
 
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("[WiFi] conectando");
@@ -283,7 +285,6 @@ void setup() {
     delay(300);
   }
   Serial.println(" OK");
-  digitalWrite(PIN_LED_STATUS, HIGH);
 
   selfRegister();
   declareCapabilities();
@@ -292,35 +293,42 @@ void setup() {
     Serial.printf("[RTDB] beginStream falló: %s\n", fbStream.errorReason().c_str());
   }
   Firebase.RTDB.setStreamCallback(&fbStream, streamCallback, streamTimeoutCallback);
+
+  lastSimTickMs = millis();
+  Serial.println("=== listo · abre la app y conéctate a " DEVICE_ID " ===\n");
 }
 
 void loop() {
-  if (!Firebase.ready()) {
-    digitalWrite(PIN_LED_STATUS, LOW);
-    return;
-  }
-  digitalWrite(PIN_LED_STATUS, HIGH);
+  if (!Firebase.ready()) return;
 
   const unsigned long now = millis();
+
+  // ── Simulación del suelo ──
+  if (now - lastSimTickMs >= SIM_TICK_MS) {
+    float dt = (now - lastSimTickMs) / 1000.0f;
+    lastSimTickMs = now;
+    tickSoilSimulation(dt);
+  }
 
   // ── Riego automático ──
   if (autoCycleActive && now - autoCycleStartMs >= AUTO_RUN_MS) {
     autoCycleActive = false;
     lastAutoCycleEnd = now;
+    Serial.println("[AUTO] ciclo de riego terminado");
   }
   if (autoMode && !autoCycleActive && !manualPumpCmd &&
-      lastSoilPct >= 0 && lastSoilPct < AUTO_ON_BELOW_PCT &&
+      soilPct < AUTO_ON_BELOW_PCT &&
       now - lastAutoCycleEnd >= AUTO_COOLDOWN_MS) {
     autoCycleActive = true;
     autoCycleStartMs = now;
-    Serial.printf("[AUTO] suelo %.0f%% < %.0f%% → ciclo de riego %lus\n",
-                  lastSoilPct, AUTO_ON_BELOW_PCT, AUTO_RUN_MS / 1000);
+    Serial.printf("[AUTO] suelo %.0f%% < %.0f%% → ciclo de riego de %lu s\n",
+                  soilPct, AUTO_ON_BELOW_PCT, AUTO_RUN_MS / 1000);
   }
 
   // ── Aplicar estado de bomba (manual O ciclo automático) ──
   const bool desired = manualPumpCmd || autoCycleActive;
-  if (desired != relayState) {
-    applyRelay(desired);
+  if (desired != pumpState) {
+    applyPump(desired);
     echoPumpState();
   }
 
@@ -330,3 +338,4 @@ void loop() {
     publishSensors();
   }
 }
+
