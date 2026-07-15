@@ -19,9 +19,10 @@ Verificado contra el working tree el **2026-07-14** (HEAD = `5198d0b`):
 | `lib/presentation/widgets/dashboard/sensor_card.dart` | Modificado | AnimatedValue + tarjetas de humedad suelo/aire |
 | `docs/v1.1_design_renovation_plan.md` | **ELIMINADO** | 100% implementado — redundante |
 | `firmware/esp32_plantylink/esp32_plantylink.ino` | Modificado | `MAP_SOIL_TO_TANK=0` (shim retirado), declara capabilities en `info/` |
-| `functions/index.js` | Sin cambios | Bug de ruta `sensores` vs `sensors` **sigue vigente** |
-| `database.rules.json` | Modificado | `.indexOn` para `history`/`alerts`; validate de `cached/` |
-| `pubspec.yaml` | Modificado | Dependencias actualizadas (google_sign_in 7.x, flutter_local_notifications 22.x, share_plus 13.x, etc.) |
+| `functions/index.js` | **Corregido + ampliado** | Ruta `sensores`→`sensors` **corregida y desplegada** (commit `3c508b8`). F0.4 añadió checks de `humedad_suelo`/`humedad_aire` (commit `4bba247`) — **commiteados pero AÚN SIN RE-DESPLEGAR**: producción no los tiene todavía |
+| `database.rules.json` | Modificado + **desplegado** | `.indexOn` para `history`/`alerts`; validate de `cached/` (commit `5198d0b`, ya en producción) |
+| `lib/core/app_config.dart` | Modificado | `kDemoMode` default → **`false`** (producción por defecto; la demo requiere `--dart-define=DEMO_MODE=true`) |
+| `pubspec.yaml` | Modificado | Dependencias actualizadas (google_sign_in 7.x, flutter_local_notifications 22.x, share_plus 13.x, etc.) — **bumps mayores sin verificar en runtime** |
 
 ### Hallazgos vigentes (de auditoría 2026-07-04, actualizados):
 
@@ -32,7 +33,9 @@ Verificado contra el working tree el **2026-07-14** (HEAD = `5198d0b`):
 5. **`cached/` es escribible por cualquier usuario autenticado** (reglas) — mitigado con validate en rules.
 6. ~~Defaults engañosos de `SensorData.fromMap`~~ **PARCIAL:** `humedadSuelo`/`humedadAire` ahora nullable; pH/EC ocultos en dispositivos suelo vía `isHydroDeviceProvider`.
 
-**[DEMO-15JUL] Estado del subconjunto de demo:** firmware existe; app tiene modo demo con 2 dispositivos. Falta ejecutar el checklist de `AUDITORIA_FIRMWARE_HARDWARE.md` para demo con hardware real (crear cuenta de dispositivo, flashear, calibrar, compilar con `--dart-define=DEMO_MODE=false`, vincular). Fix opcional: `sensores` → `sensors` en `functions/index.js`.
+**[DEMO-15JUL] Estado del subconjunto de demo:** firmware existe; app tiene modo demo con 2 dispositivos (Pro hidro + Suelo). Dos caminos para la demo:
+- **Simulación (garantizado):** compilar con `--dart-define=DEMO_MODE=true` — muestra la app completa con datos en vivo simulados, sin hardware.
+- **Hardware real (PlantyCore ↔ PlantyLink):** build normal (kDemoMode=false por defecto) + ejecutar el checklist de `AUDITORIA_FIRMWARE_HARDWARE.md` (cuenta de dispositivo, Web API key, flashear, calibrar, vincular). El fix de ruta del CF ya está hecho; **pendiente re-desplegar functions** si se quieren las push de humedad.
 
 ---
 
@@ -131,7 +134,7 @@ Un mecanismo para que app, firmware y esquema acuerden **qué sensores/actuadore
 | # | Deuda | Dónde | Gravedad |
 |---|---|---|---|
 | 1 | ~~Detección de desconexión rota~~ **PARCIAL:** `dataStalenessProvider` reemplaza `staleDataStream` — la UI ahora degrada Live→Stale→Offline por antigüedad de `timestamp`. Pendiente: el booleano `conectado` del firmware sigue sin poder volver a `false`; considerar retirarlo a favor exclusivo de staleness | `data_staleness_provider.dart`, firmware | ~~Alta~~ Baja (mitigado en UI) |
-| 2 | Bug de ruta `sensores` vs `sensors` → push FCM nunca dispara | `functions/index.js:77` | Alta, fix de 1 línea. *(También es el único fix opcional [DEMO-15JUL])* |
+| 2 | ~~Bug de ruta `sensores` vs `sensors`~~ **RESUELTO Y DESPLEGADO** (commit `3c508b8`): el trigger escucha `/devices/{id}/sensors`. Nuevo pendiente: los checks de humedad de F0.4 están commiteados pero **sin re-desplegar** (`firebase deploy --only functions`) | `functions/index.js` | ~~Alta~~ Baja (falta redeploy para push de humedad) |
 | 3 | ~~Doble escritor sobre `sensors/bomba_agua` (eco optimista de la app + eco del firmware)~~ **LADO APP RESUELTO** (`cleanup/safe-refactor`): la app escribe solo `controls/`; UI "pendiente" hasta confirmación por `sensors/`. Pendiente: firmware como único escritor de `sensors/<bomba>` | `control_service.dart`, `app_providers.dart` (`PumpCommandsNotifier`), firmware | ~~Media~~ Baja (resuelto en app) |
 | 4 | `history/` escrito por la app: huecos cuando nadie abre la app, poda que descarga el nodo completo, sin `.indexOn` | `sensor_repository_impl.dart`, `history_service.dart`, `database.rules.json` | Media-alta |
 | 5 | Reglas: device-hijack (cualquier cuenta puede reclamar cualquier `esp32_id`) y `cached/` escribible por cualquier autenticado | `database.rules.json` | Alta a escala; tolerable con 1 unidad |
@@ -140,8 +143,8 @@ Un mecanismo para que app, firmware y esquema acuerden **qué sensores/actuadore
 | 8 | Heurística EC frágil (`>10` ⇒ µS/cm) repetida en app y CF | `sensor_data.dart:34`, `functions/index.js:52` | Baja; fijar unidad canónica en esquema v2 |
 | 9 | ~~Código muerto: `registrarNFC`/`nfc_logs`, `staleDataStream`~~ **RESUELTO:** ambos eliminados | — | ~~Baja~~ Cerrado |
 | 10 | Lógica de alertas triplicada (trend provider, notifs locales, CF) | `trend_alert_provider.dart`, `notification_service.dart`, `functions/index.js` | Media |
-| 11 | README documenta reglas/esquema que no existen (`sensores/` raíz) | `README.md` | Baja |
-| 12 | Firmware: credenciales en `#define` dentro del sketch (riesgo de commit de secretos); archivo aún sin commitear | `firmware/esp32_plantylink/esp32_plantylink.ino` | Media *(mitigación mínima [DEMO-15JUL]: `secrets.h` gitignored antes del primer commit del firmware)* |
+| 11 | ~~README documenta reglas/esquema que no existen~~ **RESUELTO** (commit `e5de59a`): README apunta al esquema device-scoped real | `README.md` | ~~Baja~~ Cerrado |
+| 12 | ~~archivo sin commitear~~ **PARCIAL:** firmware commiteado con guard `.gitignore` para `firmware/**/secrets.h` (commit `a97002d`). Credenciales aún como `#define` con placeholders; extracción real a `secrets.h` pendiente (Fase 2) | `firmware/esp32_plantylink/esp32_plantylink.ino` | ~~Media~~ Baja |
 | 13 | ~~Shim `MAP_SOIL_TO_TANK`~~ **RESUELTO:** firmware commit `24342e7` puso `MAP_SOIL_TO_TANK=0` y la app ya muestra `humedad_suelo` directamente | — | ~~Media~~ Cerrado |
 
 ---
