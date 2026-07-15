@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/app_page_route.dart';
 import '../../../models/plant_profile.dart';
 import '../../providers/app_providers.dart';
 import '../plant_selector_screen.dart';
@@ -128,7 +129,7 @@ class _CropSettingsScreenState extends ConsumerState<CropSettingsScreen> {
               ),
               GestureDetector(
                 onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const PlantSelectorScreen())),
+                    AppPageRoute(builder: (_) => const PlantSelectorScreen())),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_config.dart';
+import '../../core/demo_data_service.dart';
 import '../../core/services/device_context.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_color_scheme.dart';
@@ -26,7 +27,8 @@ class SettingsScreen extends ConsumerWidget {
     final c = AppColors.of(context);
     final userAsync = ref.watch(userProfileProvider);
     final profileAsync = ref.watch(activePlantProfileProvider);
-    final sensorAsync = ref.watch(sensorProvider);
+    final staleness =
+        ref.watch(dataStalenessProvider).value ?? DataStaleness.none;
 
     return AppScaffold(
       appBar: AppBar(
@@ -96,9 +98,9 @@ class SettingsScreen extends ConsumerWidget {
             delay: 240,
             child: _buildNavTile(
               icon: Icons.memory_rounded,
-              color: _deviceColor(sensorAsync, c),
+              color: _deviceColor(staleness, c),
               title: 'Mi dispositivo',
-              subtitle: _deviceSubtitle(ref, sensorAsync),
+              subtitle: _deviceSubtitle(ref, staleness),
               onTap: () {
                 AppHaptics.light();
                 Navigator.push(context,
@@ -121,19 +123,20 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Color _deviceColor(AsyncValue sensorAsync, AppColorScheme c) {
-    return sensorAsync.whenOrNull(
-          data: (s) => (s.conectado ?? false) ? c.success : c.error,
-        ) ??
-        c.textSecondary;
+  Color _deviceColor(DataStaleness staleness, AppColorScheme c) {
+    return switch (staleness.freshness) {
+      DataFreshness.live => c.success,
+      DataFreshness.stale => c.warning,
+      DataFreshness.offline => c.error,
+    };
   }
 
-  /// "Invernadero · conectado · 2 vinculados" — active device name, live
-  /// connection state, and device count when more than one is linked.
-  String _deviceSubtitle(WidgetRef ref, AsyncValue sensorAsync) {
+  /// "Invernadero · conectado · 2 vinculados" — active device name, data
+  /// freshness state, and device count when more than one is linked.
+  String _deviceSubtitle(WidgetRef ref, DataStaleness staleness) {
     final devices = ref.watch(linkedDevicesProvider).value ?? const [];
     final activeId = kDemoMode
-        ? 'ESP32-DEMO'
+        ? ref.watch(demoActiveDeviceProvider).value ?? DemoDataService.kFullDeviceId
         : ref.watch(deviceContextProvider).value?.esp32Id;
 
     String name = 'ESP32';
@@ -144,10 +147,12 @@ class SettingsScreen extends ConsumerWidget {
       }
     }
 
-    final state = sensorAsync.whenOrNull(
-          data: (s) => (s.conectado ?? false) ? 'conectado' : 'desconectado',
-        ) ??
-        'verificando...';
+    final state = switch (staleness.freshness) {
+      DataFreshness.live => 'conectado',
+      DataFreshness.stale => 'sin datos recientes',
+      DataFreshness.offline =>
+        staleness.hasData ? 'desconectado' : 'sin datos',
+    };
 
     final count = devices.length > 1 ? ' · ${devices.length} vinculados' : '';
     return '$name · $state$count';
@@ -158,10 +163,9 @@ class SettingsScreen extends ConsumerWidget {
     final user = userAsync.value ?? const {};
     final name = user['nombre']?.toString() ?? '';
     final authUser = FirebaseAuth.instance.currentUser;
-    final identity = authUser?.email ??
-        authUser?.phoneNumber ??
-        user['ciudad']?.toString() ??
-        '';
+    // Solo identidad de inicio de sesión — la ciudad no es una identidad y
+    // mostrarla aquí era información incorrecta (Eje 5).
+    final identity = authUser?.email ?? authUser?.phoneNumber ?? '';
     final experience = ref.watch(experienceProvider);
     final isNovato = experience == 'novato';
 

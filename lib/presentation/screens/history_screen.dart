@@ -60,9 +60,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/historial_${DateTime.now().millisecondsSinceEpoch}.csv');
     await file.writeAsString(buf.toString());
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'text/csv')],
-      subject: 'Historial PlantyLink',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: 'text/csv')],
+        subject: 'Historial PlantyLink',
+      ),
     );
   }
 
@@ -318,9 +320,10 @@ class _ChartCard extends StatelessWidget {
         : bottom;
     final adjustedMaxY = maxLimit != null && maxLimit! > top ? maxLimit! : top;
 
-    final xInterval = history.length > 6
-        ? (history.length / 5).floorToDouble().clamp(1.0, double.infinity)
-        : 1.0;
+    // Eje 1.3: cap the axis at ~4 labels. ceil() (not floor) guarantees the
+    // interval never produces more labels than fit, so "HH:mm" texts can't
+    // overlap each other at any history length.
+    final xInterval = (history.length / 4).ceilToDouble().clamp(1.0, double.infinity);
 
     // Show the date alongside the time when the visible range spans
     // more than a day (7d / "Todo"), where HH:mm alone is ambiguous.

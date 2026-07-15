@@ -128,14 +128,19 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _signInWithGoogle() async {
     _setLoading(true);
     try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) { _setLoading(false); return; }
-      final googleAuth = await googleUser.authentication;
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final googleAuth = googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken:     googleAuth.idToken,
+        idToken: googleAuth.idToken,
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
+    } on GoogleSignInException catch (e) {
+      // User cancelled the sign-in flow.
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        _setLoading(false);
+        return;
+      }
+      if (mounted) setState(() => _error = 'Error al iniciar con Google');
     } on FirebaseAuthException catch (e) {
       if (mounted) setState(() => _error = _mapAuthError(e.code));
     } catch (_) {

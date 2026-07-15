@@ -37,6 +37,22 @@ const CHECKS = [
     max: (p) => p.temp_max,
   },
   {
+    key: "humedad_suelo",
+    label: "Humedad de suelo",
+    unit: "%",
+    value: (s) => s.humedad_suelo,
+    min: (p) => p.humedad_suelo_min,
+    max: (p) => p.humedad_suelo_max,
+  },
+  {
+    key: "humedad_aire",
+    label: "Humedad ambiente",
+    unit: "%",
+    value: (s) => s.humedad_aire,
+    min: (p) => p.humedad_aire_min,
+    max: (p) => p.humedad_aire_max,
+  },
+  {
     key: "ph",
     label: "pH",
     unit: "",
@@ -123,9 +139,12 @@ exports.sensorAlerts = onValueWritten(
       if (due.length === 0) return;
 
       // ── Resolve users linked to this device ─────────────────────────────
+      // Primary: users whose active device is this one.
       const usersSnap = await db.ref("usuarios")
           .orderByChild("esp32_id").equalTo(esp32Id).get();
       const users = usersSnap.val() || {};
+      // TODO: also scan usuarios/*/dispositivos/{esp32Id} for non-active
+      // owners — requires a secondary index or denormalized lookup node.
       const targets = Object.entries(users).filter(([, u]) =>
         u.fcm_token && u.alerts_enabled !== false);
       if (targets.length === 0) {

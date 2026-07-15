@@ -72,7 +72,7 @@ class NotificationService {
       requestSoundPermission: false,
     );
     await _local.initialize(
-      const InitializationSettings(android: androidInit, iOS: iosInit),
+      settings: const InitializationSettings(android: androidInit, iOS: iosInit),
     );
 
     // ── Foreground FCM messages → local notification ───────────────────────
@@ -80,10 +80,10 @@ class NotificationService {
       final notification = message.notification;
       if (notification == null) return;
       _local.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
+        id: notification.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
             _channelName,
@@ -137,10 +137,10 @@ class NotificationService {
   Future<void> showTrendAlert(String sensorKey, String message) async {
     final id = sensorKey.hashCode.abs() % 10000;
     await _local.show(
-      id,
-      '⚠️ Alerta de sensor',
-      message,
-      NotificationDetails(
+      id: id,
+      title: '⚠️ Alerta de sensor',
+      body: message,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
           _channelName,

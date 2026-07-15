@@ -118,15 +118,4 @@ class DeviceService {
       return devices;
     });
   }
-
-  /// Log an NFC scan event to `devices/{esp32Id}/nfc_logs/`.
-  Future<void> registrarNFC(String esp32Id, String usuario, int nivel) {
-    return RetryPolicy.execute(
-      () => _db.ref('devices/$esp32Id/nfc_logs').push().set({
-        'usuario': usuario,
-        'nivel': nivel,
-        'timestamp': ServerValue.timestamp,
-      }),
-    );
-  }
 }

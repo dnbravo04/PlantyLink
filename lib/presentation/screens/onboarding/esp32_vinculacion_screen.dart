@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
@@ -7,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/app_page_route.dart';
 import '../../../core/utils/haptics.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/app_toast.dart';
@@ -27,6 +29,10 @@ class _Esp32VinculacionScreenState
   // Ripple controllers (3 rings at staggered delays)
   late List<AnimationController> _rippleControllers;
   late List<Animation<double>>   _rippleAnimations;
+
+  // Success checkmark stroke animation
+  late AnimationController _checkCtrl;
+  late Animation<double>   _checkProgress;
 
   bool? _exitoso;
   bool  _isScanning      = false;
@@ -54,6 +60,15 @@ class _Esp32VinculacionScreenState
         .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
         .toList();
 
+    _checkCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _checkProgress = CurvedAnimation(
+      parent: _checkCtrl,
+      curve: Curves.easeOutCubic,
+    );
+
     _checkNfcAvailability();
   }
 
@@ -62,6 +77,7 @@ class _Esp32VinculacionScreenState
     for (final c in _rippleControllers) {
       c.dispose();
     }
+    _checkCtrl.dispose();
     NfcManager.instance.stopSession();
     super.dispose();
   }
@@ -151,6 +167,7 @@ class _Esp32VinculacionScreenState
           _isScanning = false;
         });
         _stopRipples();
+        _checkCtrl.forward();
         Future.delayed(const Duration(milliseconds: 1800), () {
           if (!mounted) return;
           if (_isFromSettings) {
@@ -276,7 +293,7 @@ class _Esp32VinculacionScreenState
   Future<void> _scanQrCode() async {
     final deviceId = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (_) => const _QrScannerPage()),
+      AppPageRoute(builder: (_) => const _QrScannerPage()),
     );
     if (deviceId != null && deviceId.isNotEmpty && mounted) {
       await _processDeviceId(deviceId);
@@ -589,14 +606,24 @@ class _Esp32VinculacionScreenState
                     );
                   },
                 ),
+              // Rotating gradient ring around the center icon
+              AnimatedBuilder(
+                animation: _rippleControllers[0],
+                builder: (_, _) => Transform.rotate(
+                  angle: _rippleControllers[0].value * 2 * math.pi,
+                  child: SizedBox(
+                    width: 90, height: 90,
+                    child: CustomPaint(
+                      painter: _GradientRingPainter(color: ringColor),
+                    ),
+                  ),
+                ),
+              ),
               Container(
                 width: 80, height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: ringColor.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: ringColor.withValues(alpha: 0.5), width: 2,
-                  ),
                   boxShadow: [
                     BoxShadow(
                       color: ringColor.withValues(alpha: 0.3),
@@ -630,17 +657,28 @@ class _Esp32VinculacionScreenState
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(
-          width: 96, height: 96,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: c.success.withValues(alpha: 0.12),
-            border: Border.all(color: c.success.withValues(alpha: 0.4), width: 2),
-            boxShadow: [
-              BoxShadow(color: c.success.withValues(alpha: 0.3), blurRadius: 24),
-            ],
+        AnimatedBuilder(
+          animation: _checkProgress,
+          builder: (context, _) => Container(
+            width: 96, height: 96,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: c.success.withValues(alpha: 0.12),
+              border: Border.all(color: c.success.withValues(alpha: 0.4), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: c.success.withValues(alpha: 0.1 + _checkProgress.value * 0.25),
+                  blurRadius: 12 + _checkProgress.value * 16,
+                ),
+              ],
+            ),
+            child: CustomPaint(
+              painter: _CheckmarkPainter(
+                progress: _checkProgress.value,
+                color: c.success,
+              ),
+            ),
           ),
-          child: Icon(Icons.check_rounded, size: 52, color: c.success),
         ),
         const SizedBox(height: 24),
         Text(
@@ -765,11 +803,10 @@ class _QrScannerPageState extends State<_QrScannerPage> {
             },
           ),
           Center(
-            child: Container(
+            child: SizedBox(
               width: 250, height: 250,
-              decoration: BoxDecoration(
-                border: Border.all(color: c.primary, width: 3),
-                borderRadius: BorderRadius.circular(24),
+              child: CustomPaint(
+                painter: _ScannerCornerPainter(color: c.primary),
               ),
             ),
           ),
@@ -790,4 +827,154 @@ class _QrScannerPageState extends State<_QrScannerPage> {
       ),
     );
   }
+}
+
+// ── Animated checkmark painter ──────────────────────────────────────────────
+
+class _CheckmarkPainter extends CustomPainter {
+  final double progress; // 0.0 → 1.0
+  final Color color;
+
+  _CheckmarkPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress == 0) return;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    // Checkmark shape: left leg then right leg
+    final p1 = Offset(cx - 18, cy + 2);  // start
+    final p2 = Offset(cx - 4, cy + 16);  // bottom
+    final p3 = Offset(cx + 20, cy - 12); // end
+
+    final path = Path()..moveTo(p1.dx, p1.dy);
+
+    // First leg: 0 → 0.4 of progress
+    if (progress <= 0.4) {
+      final t = progress / 0.4;
+      path.lineTo(
+        p1.dx + (p2.dx - p1.dx) * t,
+        p1.dy + (p2.dy - p1.dy) * t,
+      );
+    } else {
+      path.lineTo(p2.dx, p2.dy);
+      // Second leg: 0.4 → 1.0 of progress
+      final t = (progress - 0.4) / 0.6;
+      path.lineTo(
+        p2.dx + (p3.dx - p2.dx) * t,
+        p2.dy + (p3.dy - p2.dy) * t,
+      );
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_CheckmarkPainter old) =>
+      progress != old.progress || color != old.color;
+}
+
+// ── QR scanner corner brackets painter ──────────────────────────────────────
+
+class _ScannerCornerPainter extends CustomPainter {
+  final Color color;
+
+  _ScannerCornerPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    const cornerLen = 36.0;
+    const r = 12.0;
+
+    // Top-left
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, cornerLen)
+        ..lineTo(0, r)
+        ..arcToPoint(Offset(r, 0), radius: const Radius.circular(r))
+        ..lineTo(cornerLen, 0),
+      paint,
+    );
+    // Top-right
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width - cornerLen, 0)
+        ..lineTo(size.width - r, 0)
+        ..arcToPoint(Offset(size.width, r), radius: const Radius.circular(r))
+        ..lineTo(size.width, cornerLen),
+      paint,
+    );
+    // Bottom-left
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, size.height - cornerLen)
+        ..lineTo(0, size.height - r)
+        ..arcToPoint(Offset(r, size.height), radius: const Radius.circular(r))
+        ..lineTo(cornerLen, size.height),
+      paint,
+    );
+    // Bottom-right
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width - cornerLen, size.height)
+        ..lineTo(size.width - r, size.height)
+        ..arcToPoint(Offset(size.width, size.height - r),
+            radius: const Radius.circular(r))
+        ..lineTo(size.width, size.height - cornerLen),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ScannerCornerPainter old) => color != old.color;
+}
+
+// ── Rotating gradient ring for NFC scanning ─────────────────────────────────
+
+class _GradientRingPainter extends CustomPainter {
+  final Color color;
+
+  _GradientRingPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 2;
+    final paint = Paint()
+      ..shader = SweepGradient(
+        colors: [
+          color.withValues(alpha: 0.0),
+          color.withValues(alpha: 0.6),
+          color,
+        ],
+        stops: const [0.0, 0.7, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      0,
+      math.pi * 1.5,
+      false,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GradientRingPainter old) => color != old.color;
 }

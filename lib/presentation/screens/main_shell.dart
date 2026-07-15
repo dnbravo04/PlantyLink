@@ -34,6 +34,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     final selectedIndex = ref.watch(selectedTabIndexProvider);
     final hasActiveAlerts = ref.watch(trendAlertProvider).alerts.isNotEmpty;
     final isOnline = ref.watch(connectivityProvider).value ?? true;
+    // Device silence ≠ phone offline: the ESP32 can die while the phone has
+    // perfect connectivity. Both degrade the data, so both get a banner.
+    final staleness =
+        ref.watch(dataStalenessProvider).value ?? DataStaleness.none;
+    final deviceSilent = isOnline && staleness.hasData && staleness.isOffline;
 
     // Determine slide direction based on tab index change
     final goingRight = selectedIndex >= _previousIndex;
@@ -48,9 +53,20 @@ class _MainShellState extends ConsumerState<MainShell> {
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: isOnline
-                ? const SizedBox.shrink()
-                : _OfflineBanner(key: const ValueKey('offline')),
+            child: !isOnline
+                ? const _OfflineBanner(
+                    key: ValueKey('offline'),
+                    icon: Icons.wifi_off_rounded,
+                    message: 'Sin conexión — mostrando datos en caché',
+                  )
+                : deviceSilent
+                    ? _OfflineBanner(
+                        key: const ValueKey('device-silent'),
+                        icon: Icons.sensors_off_rounded,
+                        message: 'Tu dispositivo dejó de reportar hace '
+                            '${staleness.ageMinutes} min — datos congelados',
+                      )
+                    : const SizedBox.shrink(),
           ),
           Expanded(
             child: AnimatedSwitcher(
@@ -118,24 +134,34 @@ class _MainShellState extends ConsumerState<MainShell> {
 }
 
 class _OfflineBanner extends StatelessWidget {
-  const _OfflineBanner({super.key});
+  final IconData icon;
+  final String message;
+
+  const _OfflineBanner({
+    super.key,
+    required this.icon,
+    required this.message,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.of(context).warning,
-      child: const SafeArea(
+      child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
-              SizedBox(width: 8),
+              Icon(icon, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Sin conexión — mostrando datos en caché',
-                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                  message,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500),
                 ),
               ),
             ],

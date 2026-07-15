@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_config.dart';
+import '../../../core/demo_data_service.dart';
 import '../../../core/services/device_context.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/app_page_route.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../models/linked_device.dart';
 import '../../../models/sensor_data.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/app_scaffold.dart';
 import '../../widgets/common/app_toast.dart';
+import '../../widgets/common/sensor_health_card.dart';
 import '../../../app.dart';
 import '../calibration_screen.dart';
 import '../scheduling_screen.dart';
@@ -22,9 +25,11 @@ class DeviceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = AppColors.of(context);
     final sensorAsync = ref.watch(sensorProvider);
+    final staleness =
+        ref.watch(dataStalenessProvider).value ?? DataStaleness.none;
 
     final activeId = kDemoMode
-        ? 'ESP32-DEMO'
+        ? ref.watch(demoActiveDeviceProvider).value ?? DemoDataService.kFullDeviceId
         : ref.watch(deviceContextProvider).value?.esp32Id;
     final devices = ref.watch(linkedDevicesProvider).value ?? const [];
     var activeName = 'ESP32';
@@ -44,7 +49,8 @@ class DeviceScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          _buildDeviceStatusCard(sensorAsync, c, context, activeName, activeId),
+          _buildDeviceStatusCard(
+              sensorAsync, staleness, c, context, activeName, activeId),
           const SizedBox(height: 24),
           Text('Mis dispositivos',
               style: TextStyle(
@@ -54,13 +60,16 @@ class DeviceScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           _buildDevicesCard(context, ref, c),
           const SizedBox(height: 16),
+          // Diagnóstico de deriva de sensores (antes vivía en Agronomía).
+          const SensorHealthCard(),
+          const SizedBox(height: 16),
           _buildNavRow(
             icon: Icons.tune_rounded,
             color: c.info,
             title: 'Calibración de sensores',
             subtitle: 'pH y EC de 2 puntos',
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const CalibrationScreen())),
+                AppPageRoute(builder: (_) => const CalibrationScreen())),
             c: c,
           ),
           const SizedBox(height: 8),
@@ -70,7 +79,7 @@ class DeviceScreen extends ConsumerWidget {
             title: 'Programación de actuadores',
             subtitle: 'Bombas, ventiladores',
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const SchedulingScreen())),
+                AppPageRoute(builder: (_) => const SchedulingScreen())),
             c: c,
           ),
           const SizedBox(height: 24),
@@ -81,13 +90,23 @@ class DeviceScreen extends ConsumerWidget {
 
   Widget _buildDeviceStatusCard(
       AsyncValue<SensorData> sensorAsync,
+      DataStaleness staleness,
       AppColorScheme c,
       BuildContext context,
       String activeName,
       String? activeId) {
     return sensorAsync.when(
       data: (sensor) {
-        final connected = sensor.conectado ?? false;
+        // Estado derivado de la frescura del timestamp, no del booleano
+        // `conectado` que el firmware nunca vuelve a poner en false (Eje 4).
+        final (statusColor, statusText) = switch (staleness.freshness) {
+          DataFreshness.live => (c.success, '$activeName conectado'),
+          DataFreshness.stale => (
+              c.warning,
+              '$activeName sin reportar hace ${staleness.ageMinutes} min',
+            ),
+          DataFreshness.offline => (c.error, '$activeName desconectado'),
+        };
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -102,12 +121,11 @@ class DeviceScreen extends ConsumerWidget {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: connected ? c.success : c.error,
+                    color: statusColor,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: (connected ? c.success : c.error)
-                            .withValues(alpha: 0.5),
+                        color: statusColor.withValues(alpha: 0.5),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -117,9 +135,7 @@ class DeviceScreen extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    connected
-                        ? '$activeName conectado'
-                        : '$activeName desconectado',
+                    statusText,
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -178,7 +194,7 @@ class DeviceScreen extends ConsumerWidget {
       BuildContext context, WidgetRef ref, AppColorScheme c) {
     final devicesAsync = ref.watch(linkedDevicesProvider);
     final activeId = kDemoMode
-        ? 'ESP32-DEMO'
+        ? ref.watch(demoActiveDeviceProvider).value ?? DemoDataService.kFullDeviceId
         : ref.watch(deviceContextProvider).value?.esp32Id;
 
     return Container(
@@ -261,11 +277,14 @@ class DeviceScreen extends ConsumerWidget {
 
   Future<void> _switchDevice(
       BuildContext context, WidgetRef ref, LinkedDevice device) async {
-    if (kDemoMode) return;
     AppHaptics.selection();
-    await ref
-        .read(deviceServiceProvider)
-        .cambiarDispositivoActivo(device.id);
+    if (kDemoMode) {
+      ref.read(demoDataServiceProvider)?.switchDevice(device.id);
+    } else {
+      await ref
+          .read(deviceServiceProvider)
+          .cambiarDispositivoActivo(device.id);
+    }
     if (context.mounted) {
       AppToast.show(context,
           message: 'Ahora ves ${device.nombre}', type: ToastType.success);
