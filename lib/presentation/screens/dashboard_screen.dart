@@ -645,8 +645,11 @@ class DashboardScreen extends ConsumerWidget {
         (info.isEmpty && isHydro);
     if (!showWater && !showFert) return const SizedBox.shrink();
 
+    // Pumps commanded but not yet confirmed by the firmware via `sensors/`.
+    final pending = ref.watch(pumpCommandsProvider);
+
     void toggle(String pumpId, bool current) {
-      ref.read(sensorRepositoryProvider)?.togglePump(pumpId, !current);
+      ref.read(pumpCommandsProvider.notifier).send(pumpId, !current);
     }
 
     Widget button({
@@ -667,6 +670,8 @@ class DashboardScreen extends ConsumerWidget {
           isActive: isActive,
           isAutoMode: auto ?? false,
           isManualOverride: override ?? false,
+          // Command sent, awaiting firmware echo → spinner + tap disabled.
+          isLoading: pending.containsKey(pumpId),
           onTap: () => toggle(pumpId, isActive),
         ),
       );
