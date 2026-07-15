@@ -28,6 +28,7 @@ import '../../models/pump_schedule.dart';
 import '../../models/trend_alert.dart';
 
 export 'agronomic_providers.dart';
+export 'data_staleness_provider.dart';
 
 // ── Core services ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,14 @@ export 'agronomic_providers.dart';
 /// otherwise null. Repositories check for null to choose their data source.
 final demoDataServiceProvider = Provider<DemoDataService?>((ref) {
   return kDemoMode ? DemoDataService() : null;
+});
+
+/// Tracks which demo device is currently active. Providers that depend on
+/// device identity watch this to rebuild when the user switches devices.
+final demoActiveDeviceProvider = StreamProvider<String>((ref) {
+  final demo = ref.watch(demoDataServiceProvider);
+  if (demo == null) return Stream.value('');
+  return demo.activeDeviceStream;
 });
 
 /// Reactive device context — resolves the current user's linked ESP32 ID.
@@ -94,13 +103,40 @@ final deviceInfoServiceProvider = Provider<DeviceInfoService?>((ref) {
   return DeviceInfoService(esp32Id: ctx.esp32Id);
 });
 
-/// Live capability model for the active device. Emits an empty [DeviceInfo]
-/// (isEmpty == true) in demo mode, before a device is linked, or when the
-/// device hasn't published `info/` yet — consumers then show everything.
+/// Live capability model for the active device. In demo mode, returns the
+/// capabilities of the currently selected demo device. In production, reads
+/// from `devices/{id}/info/`.
 final deviceInfoProvider = StreamProvider<DeviceInfo>((ref) {
+  if (kDemoMode) {
+    final demo = ref.watch(demoDataServiceProvider);
+    if (demo == null) return Stream.value(const DeviceInfo());
+    // Re-evaluate whenever the active demo device changes.
+    ref.watch(demoActiveDeviceProvider);
+    return Stream.value(demo.activeDeviceInfo);
+  }
   final service = ref.watch(deviceInfoServiceProvider);
   if (service == null) return Stream.value(const DeviceInfo());
   return service.infoStream;
+});
+
+/// True when the active device should be treated as hydroponic and the UI may
+/// show pH/EC/tanques/dosificadoras (modelo de capacidades, decisión P1
+/// soil-first de ROADMAP_PRODUCTO.md).
+///
+/// - Device with declared capabilities: hydro iff it says so (tipo_cultivo or
+///   pH/EC sensors present).
+/// - Legacy/demo device without `info/`: inferred from data — if it reports
+///   soil moisture it's a soil unit; otherwise assume the old full-hydro set
+///   so real data is never hidden.
+final isHydroDeviceProvider = Provider<bool>((ref) {
+  final info = ref.watch(deviceInfoProvider).value;
+  if (info != null && !info.isEmpty) {
+    return info.tipoCultivo == 'hidroponico' ||
+        info.hasSensor('ph') ||
+        info.hasSensor('conductividad');
+  }
+  final sensor = ref.watch(sensorProvider).value;
+  return sensor?.humedadSuelo == null;
 });
 
 final deviceServiceProvider = Provider<DeviceService>((ref) {
@@ -111,9 +147,14 @@ final deviceServiceProvider = Provider<DeviceService>((ref) {
 /// The active one is whichever matches [deviceContextProvider]'s esp32Id.
 final linkedDevicesProvider = StreamProvider<List<LinkedDevice>>((ref) {
   if (kDemoMode) {
-    return Stream.value(const [
-      LinkedDevice(id: 'ESP32-DEMO', nombre: 'PlantyLink Demo'),
-    ]);
+    final demo = ref.watch(demoDataServiceProvider);
+    if (demo != null) {
+      return Stream.value([
+        for (final d in demo.demoDevices)
+          LinkedDevice(id: d.id, nombre: d.nombre),
+      ]);
+    }
+    return Stream.value(const []);
   }
   // Re-subscribe on sign-in/sign-out so the stream follows the current user.
   ref.watch(deviceContextProvider);
@@ -137,7 +178,8 @@ final userServiceProvider = Provider<UserService?>((ref) {
 final sensorRepositoryProvider = Provider<SensorRepository?>((ref) {
   final demo = ref.watch(demoDataServiceProvider);
   if (kDemoMode && demo != null) {
-    // Demo mode: no device context needed, use in-memory simulation.
+    // Rebuild when the active demo device changes so streams re-subscribe.
+    ref.watch(demoActiveDeviceProvider);
     return SensorRepositoryImpl(
       sensorStreamService: null,
       controlService: null,
@@ -164,6 +206,7 @@ final sensorRepositoryProvider = Provider<SensorRepository?>((ref) {
 final plantRepositoryProvider = Provider<PlantRepository?>((ref) {
   final demo = ref.watch(demoDataServiceProvider);
   if (kDemoMode && demo != null) {
+    ref.watch(demoActiveDeviceProvider);
     return PlantRepositoryImpl(
       profileService: null,
       demoService: demo,

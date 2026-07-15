@@ -6,14 +6,11 @@ import '../../core/theme/app_color_scheme.dart';
 import '../../core/theme/app_tokens.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/utils/units.dart';
-import '../../domain/services/agronomic_service.dart';
 import '../../models/plant_profile.dart';
 import '../../models/sensor_data.dart';
-import '../../models/trend_alert.dart';
 import '../../models/agronomic/growth_stage.dart';
 import '../../models/agronomic/nutrient_recommendation.dart';
 import '../../models/agronomic/ph_correction.dart';
-import '../../models/agronomic/sensor_health.dart';
 import '../providers/app_providers.dart';
 import '../providers/navigation_provider.dart';
 import '../widgets/common/app_scaffold.dart';
@@ -32,8 +29,10 @@ class AgronomicScreen extends ConsumerWidget {
     final profileAsync = ref.watch(activePlantProfileProvider);
     final plantingDateAsync = ref.watch(plantingDateProvider);
     final sensorAsync = ref.watch(sensorProvider);
-    final historyAsync = ref.watch(historyStreamProvider);
     final service = ref.watch(agronomicServiceProvider);
+    // Soil-first (Eje 3): la complejidad hidropónica (nutrición EC/NPK y
+    // corrección de pH) solo aparece si el dispositivo es hidropónico.
+    final isHydro = ref.watch(isHydroDeviceProvider);
 
     final profile = profileAsync.value;
 
@@ -81,31 +80,34 @@ class AgronomicScreen extends ConsumerWidget {
                 onPickDate: () => _pickPlantingDate(context, ref, plantingDate),
               ),
               const SizedBox(height: AppTokens.spacingMd),
-              if (recommendation != null) ...[
-                _NutrientTargetsCard(
-                  delay: 80,
-                  c: c,
-                  rec: recommendation,
-                  currentPh: sensor?.ph,
-                  currentEc: sensor?.ecNormalized,
-                  units: units,
-                  isNovato: isNovato,
-                ),
-                const SizedBox(height: AppTokens.spacingMd),
-              ],
-              _PhCalculatorCard(
-                delay: 160,
+              _DailyRecommendationsCard(
+                delay: 80,
                 c: c,
+                sensor: sensor,
                 profile: profile,
-                sensorPh: sensor?.ph,
               ),
-              const SizedBox(height: AppTokens.spacingMd),
-              _SensorHealthCard(
-                delay: 240,
-                c: c,
-                service: service,
-                history: historyAsync.value ?? const [],
-              ),
+              // ── Solo hidroponía: nutrición EC/NPK y corrección de pH ──
+              if (isHydro) ...[
+                if (recommendation != null) ...[
+                  const SizedBox(height: AppTokens.spacingMd),
+                  _NutrientTargetsCard(
+                    delay: 160,
+                    c: c,
+                    rec: recommendation,
+                    currentPh: sensor?.ph,
+                    currentEc: sensor?.ecNormalized,
+                    units: units,
+                    isNovato: isNovato,
+                  ),
+                ],
+                const SizedBox(height: AppTokens.spacingMd),
+                _PhCalculatorCard(
+                  delay: 240,
+                  c: c,
+                  profile: profile,
+                  sensorPh: sensor?.ph,
+                ),
+              ],
               const SizedBox(height: AppTokens.spacingLg),
               _Disclaimer(c: c),
               const SizedBox(height: AppTokens.spacingLg),
@@ -879,43 +881,97 @@ class _StepButton extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// Sensor health / drift card
+// Daily recommendations (soil-first, beginner-friendly)
 // ════════════════════════════════════════════════════════════════════════════
 
-class _SensorHealthCard extends StatelessWidget {
-  const _SensorHealthCard({
+/// Simple actionable checklist for the day. Derives what it can from the
+/// live reading; falls back to general care tips when there's no data.
+/// (La "Salud de sensores" se movió a Sistema → Mi dispositivo.)
+class _DailyRecommendationsCard extends StatelessWidget {
+  const _DailyRecommendationsCard({
     required this.delay,
     required this.c,
-    required this.service,
-    required this.history,
+    required this.sensor,
+    required this.profile,
   });
 
   final int delay;
   final AppColorScheme c;
-  final AgronomicService service;
-  final List<SensorData> history;
+  final SensorData? sensor;
+  final PlantProfile profile;
 
-  static const _sensors = ['ph', 'conductividad', 'temperatura'];
+  List<(IconData, Color, String)> _recommendations() {
+    final items = <(IconData, Color, String)>[];
 
-  List<SensorReading> _readings(String key) {
-    return history
-        .map((s) {
-          final double? v = switch (key) {
-            'ph' => s.ph,
-            'conductividad' => s.conductividad,
-            'temperatura' => s.temperatura,
-            _ => null,
-          };
-          return v == null
-              ? null
-              : SensorReading(value: v, timestamp: s.timestamp);
-        })
-        .whereType<SensorReading>()
-        .toList();
+    final soil = sensor?.humedadSuelo;
+    if (soil != null) {
+      final min = profile.humedadSueloMin ?? 30;
+      final max = profile.humedadSueloMax ?? 70;
+      if (soil < min) {
+        items.add((
+          Icons.water_drop_rounded,
+          c.warning,
+          'El suelo está seco. Riega tu planta hoy.',
+        ));
+      } else if (soil > max) {
+        items.add((
+          Icons.pause_circle_rounded,
+          c.info,
+          'El suelo está muy húmedo. Espera antes de volver a regar.',
+        ));
+      } else {
+        items.add((
+          Icons.check_circle_rounded,
+          c.success,
+          'Humedad de suelo óptima. No requiere riego hoy.',
+        ));
+      }
+    }
+
+    final temp = sensor?.temperatura;
+    if (temp != null) {
+      if (temp < 15) {
+        items.add((
+          Icons.ac_unit_rounded,
+          c.info,
+          'Hace frío para tu planta. Aléjala de ventanas y corrientes de aire.',
+        ));
+      } else if (temp > 30) {
+        items.add((
+          Icons.wb_sunny_rounded,
+          c.warning,
+          'Hace calor. Dale sombra o mejora la ventilación.',
+        ));
+      } else {
+        items.add((
+          Icons.check_circle_rounded,
+          c.success,
+          'Temperatura ambiente adecuada para el cultivo.',
+        ));
+      }
+    }
+
+    // Tip general del día (estático por ahora).
+    items.add((
+      Icons.search_rounded,
+      c.textMuted,
+      'Revisa las hojas en busca de plagas o manchas.',
+    ));
+
+    if (items.length == 1) {
+      // Sin datos de sensores: solo consejos generales.
+      items.insert(0, (
+        Icons.eco_rounded,
+        c.success,
+        'Conecta tu dispositivo para recibir recomendaciones personalizadas.',
+      ));
+    }
+    return items;
   }
 
   @override
   Widget build(BuildContext context) {
+    final items = _recommendations();
     return AnimatedAppCard(
       delay: delay,
       padding: const EdgeInsets.all(AppTokens.spacingMd),
@@ -923,80 +979,38 @@ class _SensorHealthCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CardTitle(
-            icon: Icons.monitor_heart_rounded,
-            label: 'Salud de sensores',
+            icon: Icons.checklist_rounded,
+            label: 'Recomendaciones diarias',
             c: c,
           ),
-          const SizedBox(height: AppTokens.spacingSm),
-          for (var i = 0; i < _sensors.length; i++) ...[
-            _HealthRow(
-              c: c,
-              health: service.detectDrift(_sensors[i], _readings(_sensors[i])),
-            ),
-            if (i < _sensors.length - 1)
-              Divider(color: c.cardBorder, height: AppTokens.spacingLg),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _HealthRow extends StatelessWidget {
-  const _HealthRow({required this.c, required this.health});
-
-  final AppColorScheme c;
-  final SensorHealth health;
-
-  Color get _color => switch (health.status) {
-        SensorHealthStatus.ok => c.success,
-        SensorHealthStatus.warning => c.warning,
-        SensorHealthStatus.critical => c.error,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 3),
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: AppTokens.spacingSm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    health.sensorLabel,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: c.textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  _StatusChip(color: _color, text: health.status.label),
-                ],
+          const SizedBox(height: AppTokens.spacingXs),
+          for (var i = 0; i < items.length; i++) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: items[i].$2.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                ),
+                child: Icon(items[i].$1, color: items[i].$2, size: 18),
               ),
-              const SizedBox(height: 2),
-              Text(
-                health.recommendation,
+              title: Text(
+                items[i].$3,
                 style: TextStyle(
-                  fontSize: 12.5,
-                  color: c.textSecondary,
+                  fontSize: 13.5,
+                  color: c.textPrimary,
                   height: 1.4,
                 ),
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+            if (i < items.length - 1)
+              Divider(color: c.cardBorder, height: 1),
+          ],
+        ],
+      ),
     );
   }
 }

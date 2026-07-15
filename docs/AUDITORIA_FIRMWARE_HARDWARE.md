@@ -85,8 +85,8 @@ usuarios/{uid}/
 
 1. **Bug de ruta en Cloud Functions:** `functions/index.js` escucha `/devices/{esp32Id}/sensores` (español) pero la app lee/escribe `devices/{esp32Id}/sensors` (inglés). **La función de push FCM nunca se dispara hoy.** Arreglo de una línea (cambiar `sensores` → `sensors` y redesplegar) si se quieren notificaciones push en la demo.
 2. **README desactualizado:** documenta unas reglas con nodo raíz `sensores/` que no coinciden con `database.rules.json` real.
-3. **La app no tiene UI de humedad de suelo ni humedad ambiente.** El dashboard muestra: temperatura, pH, EC, tanque de agua, fertilizante. `SensorData` no tiene campo `humedad_suelo`. El pedido de priorizar humedad de suelo + DHT22 para la demo **no encaja 1:1 con la UI actual** — ver decisión tomada en "Firmware generado".
-4. **Umbral de staleness = 10 s:** el firmware debe publicar a intervalos menores o el dashboard mostrará "desconectado".
+3. ~~**La app no tiene UI de humedad de suelo ni humedad ambiente.**~~ **RESUELTO.** `SensorData` ya tiene `humedadSuelo` y `humedadAire` (nullable — `null` = sin sensor). El dashboard y `SimpleMetricsGrid` los muestran condicionalmente. `isHydroDeviceProvider` oculta pH/EC/tanques en dispositivos de suelo.
+4. **Staleness:** `dataStalenessProvider` ahora deriva la frescura de `timestamp` con umbrales 5 min (live) / 15 min (stale) / >15 min (offline), reemplazando al `staleDataStream` muerto. El firmware sigue publicando cada 5 s, lo cual mantiene el estado "live" con holgura.
 5. **`timestamp` en milisegundos epoch:** un timestamp mal formado deja la app en "stale" permanente. El firmware generado usa el timestamp del servidor RTDB para evitar depender de NTP.
 6. **Para la demo la app debe compilarse con `--dart-define=DEMO_MODE=false`**, si no, ignora Firebase por completo.
 
@@ -487,7 +487,7 @@ Derivada estrictamente del firmware anterior (no del "diseño ideal" de la app).
 
 ### Pendientes explícitos post-demo
 
-- UI en Flutter para `humedad_suelo` y `humedad_aire` (hoy el modelo `SensorData` ni las lee).
+- ~~UI en Flutter para `humedad_suelo` y `humedad_aire`.~~ **RESUELTO** — `SensorData` los parsea como nullable, el dashboard los muestra, `isHydroDeviceProvider` condiciona la UI.
 - Fix de una línea en `functions/index.js` (`sensores` → `sensors`) para que funcionen las push FCM.
 - Ejecución de `schedules/` y aplicación de `calibration/` en firmware.
 - Sensores de pH, EC y nivel de tanque + las 3 bombas restantes, si el producto sigue la línea hidropónica que la app ya modela.

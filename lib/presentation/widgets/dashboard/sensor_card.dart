@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_tokens.dart';
+import '../../providers/data_staleness_provider.dart';
+import '../common/animated_value.dart';
 import '../common/pulsing_dot.dart';
 
 /// Compact card for a single sensor reading (pH, Temp, EC).
 /// Features a colored left-edge accent bar, animated value, and pulsing status dot.
+///
+/// [freshness] dims the numeric value and calms the status dot when the data
+/// is stale or the device is offline, so frozen readings never look live.
 class SensorCard extends StatelessWidget {
   final String label;
   final String value;
@@ -14,6 +19,9 @@ class SensorCard extends StatelessWidget {
   final IconData icon;
   final Color statusColor;
   final bool isInRange;
+  final DataFreshness freshness;
+  final double? numericValue;
+  final String Function(double)? valueFormatter;
 
   const SensorCard({
     super.key,
@@ -23,11 +31,19 @@ class SensorCard extends StatelessWidget {
     required this.icon,
     required this.statusColor,
     required this.isInRange,
+    this.freshness = DataFreshness.live,
+    this.numericValue,
+    this.valueFormatter,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
+    final valueColor = switch (freshness) {
+      DataFreshness.live => c.textPrimary,
+      DataFreshness.stale => c.textMuted,
+      DataFreshness.offline => c.textDisabled,
+    };
     return Container(
       decoration: BoxDecoration(
         color: c.cardBackground,
@@ -71,38 +87,76 @@ class SensorCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: value,
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    color: c.textPrimary,
-                                    height: 1.1,
+                          numericValue != null && valueFormatter != null
+                              ? Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AnimatedValue(
+                                      value: numericValue!,
+                                      formatter: valueFormatter!,
+                                      style: GoogleFonts.spaceGrotesk(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w700,
+                                        color: valueColor,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    if (unit.isNotEmpty)
+                                      Text(
+                                        ' $unit',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: c.textMuted,
+                                        ),
+                                      ),
+                                  ],
+                                )
+                              : RichText(
+                                  text: TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: value,
+                                        style: GoogleFonts.spaceGrotesk(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          color: valueColor,
+                                          height: 1.1,
+                                        ),
+                                      ),
+                                      if (unit.isNotEmpty)
+                                        TextSpan(
+                                          text: ' $unit',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: c.textMuted,
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                                if (unit.isNotEmpty)
-                                  TextSpan(
-                                    text: ' $unit',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: c.textMuted,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),
-                    // Pulsing status dot
-                    PulsingDot(
-                      color: statusColor,
-                      isOffline: !isInRange && statusColor == c.textMuted,
-                    ),
+                    // Pulsing status dot — severity follows data freshness.
+                    switch (freshness) {
+                      DataFreshness.live => PulsingDot(
+                          color: statusColor,
+                          isOffline: !isInRange && statusColor == c.textMuted,
+                        ),
+                      DataFreshness.stale => PulsingDot(
+                          color: c.warning,
+                          pulseDuration: const Duration(seconds: 3),
+                        ),
+                      DataFreshness.offline => PulsingDot(
+                          color: c.textMuted,
+                          isOffline: true,
+                        ),
+                    },
                   ],
                 ),
               ),
@@ -122,6 +176,7 @@ class TankLevelCard extends StatelessWidget {
   final double percent; // 0.0–100.0
   final IconData icon;
   final Color color;
+  final DataFreshness freshness;
 
   const TankLevelCard({
     super.key,
@@ -130,12 +185,18 @@ class TankLevelCard extends StatelessWidget {
     required this.percent,
     required this.icon,
     required this.color,
+    this.freshness = DataFreshness.live,
   });
 
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final fill = (percent / 100).clamp(0.0, 1.0);
+    final percentColor = switch (freshness) {
+      DataFreshness.live => color,
+      DataFreshness.stale => c.textMuted,
+      DataFreshness.offline => c.textDisabled,
+    };
 
     return Container(
       padding: const EdgeInsets.all(AppTokens.spacingMd),
@@ -164,7 +225,7 @@ class TankLevelCard extends StatelessWidget {
               Text(
                 '${percent.toStringAsFixed(0)}%',
                 style: GoogleFonts.spaceGrotesk(
-                  fontSize: 16, fontWeight: FontWeight.w700, color: color,
+                  fontSize: 16, fontWeight: FontWeight.w700, color: percentColor,
                 ),
               ),
             ],

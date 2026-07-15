@@ -7,27 +7,32 @@ Documento complementario a `docs/AUDITORIA_FIRMWARE_HARDWARE.md` (auditoría té
 
 ## Cambios desde la última auditoría
 
-Verificado contra el working tree el 2026-07-04 (HEAD = `d2596b0`):
+Verificado contra el working tree el **2026-07-14** (HEAD = `5198d0b`):
 
-| Qué | Estado | Cambio |
+| Qué | Estado | Cambio desde última auditoría (2026-07-04) |
 |---|---|---|
-| `firmware/esp32_plantylink/esp32_plantylink.ino` | **Existe** (13.4 KB) | NUEVO desde la auditoría — generado en la sesión anterior. **Sin modificaciones posteriores y SIN COMMITEAR** (untracked) |
-| `docs/AUDITORIA_FIRMWARE_HARDWARE.md` | Existe | NUEVO — también sin commitear |
-| `lib/` (modelos, servicios, pantallas) | Sin cambios vs HEAD | `SensorData` sigue **sin** campos `humedad_suelo`/`humedad_aire`; `kDemoMode` sigue con default `true` |
-| `functions/index.js` | Sin cambios | El bug de ruta `sensores` vs `sensors` (línea 77) **sigue vigente** |
-| `database.rules.json` | Sin cambios | Sin `.indexOn` para `history`/`alerts`; hueco de "device hijack" vigente |
-| Commits nuevos | Ninguno | El último commit (`d2596b0`) es anterior a la auditoría (solo assets) |
+| `lib/models/sensor_data.dart` | Modificado | `humedadSuelo`/`humedadAire` ahora nullable (null = sin sensor) |
+| `lib/core/demo_data_service.dart` | Reescrito | Simula **2 dispositivos** (full-hydro + soil-only) con switch |
+| `lib/presentation/providers/app_providers.dart` | Modificado | `demoActiveDeviceProvider`, `deviceInfoProvider` con capabilities en demo, multi-device `linkedDevicesProvider` |
+| `lib/presentation/providers/data_staleness_provider.dart` | **NUEVO** | Reemplaza `staleDataStream` — Live/Stale/Offline por antigüedad de timestamp |
+| `lib/models/device_info.dart` + `device_info_service.dart` | **NUEVO** | Modelo de capacidades (`sensores`, `actuadores`, `tipo_cultivo`) |
+| `lib/presentation/widgets/dashboard/sensor_card.dart` | Modificado | AnimatedValue + tarjetas de humedad suelo/aire |
+| `docs/v1.1_design_renovation_plan.md` | **ELIMINADO** | 100% implementado — redundante |
+| `firmware/esp32_plantylink/esp32_plantylink.ino` | Modificado | `MAP_SOIL_TO_TANK=0` (shim retirado), declara capabilities en `info/` |
+| `functions/index.js` | Sin cambios | Bug de ruta `sensores` vs `sensors` **sigue vigente** |
+| `database.rules.json` | Modificado | `.indexOn` para `history`/`alerts`; validate de `cached/` |
+| `pubspec.yaml` | Modificado | Dependencias actualizadas (google_sign_in 7.x, flutter_local_notifications 22.x, share_plus 13.x, etc.) |
 
-Hallazgos **nuevos** de esta pasada (no estaban en la auditoría anterior):
+### Hallazgos vigentes (de auditoría 2026-07-04, actualizados):
 
-1. **La detección de desconexión está rota de punta a punta.** El chip "Conectado / Sin conexión" del dashboard (`dashboard_screen.dart:238`) lee `sensor.conectado`, un booleano que el firmware escribe `true` y que **nunca puede volver a `false`** si el dispositivo muere (el cliente REST del ESP32 no soporta `onDisconnect`). El mecanismo correcto — `staleDataStream` por antigüedad de `timestamp` en `sensor_stream_service.dart:34` — **es código muerto: nadie lo consume**. Hoy, si el ESP32 se apaga, la app muestra "Conectado" con valores congelados indefinidamente.
-2. **La lógica multi-dispositivo SÍ está completa** (pregunta abierta de la sesión anterior): cambiar activo (`device_screen.dart` → `cambiarDispositivoActivo`), renombrar, desvincular con fallback al primer dispositivo restante, y dispositivos legacy sintetizados en la lista. Todo device-scoped se reconstruye reactivo vía `deviceContextProvider` (un solo puntero `usuarios/{uid}/esp32_id`). Brecha restante: la lista de dispositivos no muestra estado online por dispositivo.
-3. **`DeviceService.registrarNFC` es código muerto** — definido, jamás llamado. El nodo `nfc_logs/` no lo escribe ni lo lee nadie.
-4. **La lógica de alertas vive en 3 lugares** sin fuente única de verdad: `trend_alert_provider.dart` (tendencias en-app), `notification_service.dart` (notifs locales) y `functions/index.js` (push por umbral — hoy muerto por el bug de ruta).
-5. **`cached/` es escribible por cualquier usuario autenticado** (reglas): cualquier cuenta puede envenenar la caché compartida de la API de plantas.
-6. El dashboard sí tiene empty-state "Sin dispositivo vinculado" (bien); el caso "dispositivo vinculado pero que nunca escribió" cae en defaults engañosos de `SensorData.fromMap` (pH 7.0 "perfecto", temperatura 0.0).
+1. ~~**Detección de desconexión rota**~~ **MITIGADO.** `dataStalenessProvider` consume la antigüedad del timestamp (5min/15min umbrales). El booleano `conectado` del firmware sigue sin poder volver a `false`, pero la UI ya no depende de él para mostrar estado.
+2. **La lógica multi-dispositivo está completa** en producción Y en demo. Brecha restante: la lista de dispositivos no muestra estado online por dispositivo.
+3. **`DeviceService.registrarNFC` es código muerto** — definido, jamás llamado.
+4. **La lógica de alertas vive en 3 lugares** sin fuente única de verdad.
+5. **`cached/` es escribible por cualquier usuario autenticado** (reglas) — mitigado con validate en rules.
+6. ~~Defaults engañosos de `SensorData.fromMap`~~ **PARCIAL:** `humedadSuelo`/`humedadAire` ahora nullable; pH/EC ocultos en dispositivos suelo vía `isHydroDeviceProvider`.
 
-**[DEMO-15JUL] Estado del subconjunto de demo:** el firmware existe y cubre suelo+DHT22+bomba+sync; falta ejecutar el checklist de `AUDITORIA_FIRMWARE_HARDWARE.md` (crear cuenta de dispositivo, flashear, calibrar, compilar app con `--dart-define=DEMO_MODE=false`, vincular). Único trabajo de código opcional pre-demo: fix de una línea en `functions/index.js` si se quieren push, y (recomendado) commitear `firmware/` y `docs/` para no perderlos.
+**[DEMO-15JUL] Estado del subconjunto de demo:** firmware existe; app tiene modo demo con 2 dispositivos. Falta ejecutar el checklist de `AUDITORIA_FIRMWARE_HARDWARE.md` para demo con hardware real (crear cuenta de dispositivo, flashear, calibrar, compilar con `--dart-define=DEMO_MODE=false`, vincular). Fix opcional: `sensores` → `sensors` en `functions/index.js`.
 
 ---
 
@@ -69,9 +74,9 @@ Un mecanismo para que app, firmware y esquema acuerden **qué sensores/actuadore
 
 1. ~~Responder P1–P4~~ **HECHO 2026-07-04** (ver sección anterior): suelo-first con modelo de capacidades, 1 dispositivo = 1 cultivo, lazo de control en firmware, fallback por actuador. Única pendiente de producto: empaque comercial (SKUs vs modular) — no bloquea el esquema.
 2. **Esquema v2 de `devices/{id}`:**
-   - Campos propios `humedad_suelo` / `humedad_aire` en `sensors/` + parseo en `SensorData` → **elimina el shim `MAP_SOIL_TO_TANK`** del firmware (poner el `#define` a 0 el mismo día que la app muestre el campo real).
-   - Nodo `devices/{id}/info/` (capacidades, versión de firmware, modelo de hardware) — adoptado por la decisión P1.
-   - `PlantProfile` con umbrales de suelo (`humedad_suelo_min/max`) + discriminador `tipo_cultivo` + **catálogo de plantas de tierra** (el `PlantCatalog` actual es de hortalizas hidropónicas con umbrales EC/pH — el caso base del producto ya no es ese).
+   - ~~Campos propios `humedad_suelo` / `humedad_aire` en `sensors/` + parseo en `SensorData`~~ **HECHO.** `SensorData` los parsea como nullable; shim `MAP_SOIL_TO_TANK=0` en firmware.
+   - ~~Nodo `devices/{id}/info/` (capacidades, versión de firmware, modelo de hardware)~~ **HECHO.** `DeviceInfo` modelo + `DeviceInfoService` + `deviceInfoProvider`.
+   - `PlantProfile` con umbrales de suelo (`humedad_suelo_min/max`) + discriminador `tipo_cultivo` + **catálogo de plantas de tierra** (el `PlantCatalog` actual es de hortalizas hidropónicas con umbrales EC/pH — el caso base del producto ya no es ese). **PARCIAL:** `PlantProfile` tiene `tipoCultivo` y `humedadSueloMin/Max`; `PlantCatalog.plantasSuelo` existe con 5 plantas de tierra.
    - Revisión de escalabilidad: el nodo `sensors/` plano con ~20 campos opcionales ya muestra el anti-patrón "un nodo gigante con campos para todo". Con capacidades declaradas en `info/`, `sensors/` plano es tolerable; sin ellas, no.
 3. **Arreglos baratos e independientes (pueden ir primero, no dependen de P1–P4):** fix `sensores`→`sensors` en `functions/index.js`; `.indexOn: ["timestamp"]` para `history` y `alerts`; endurecer `cached/` (solo lectura para clientes, escritura vía CF); actualizar README.
 
@@ -109,8 +114,8 @@ Un mecanismo para que app, firmware y esquema acuerden **qué sensores/actuadore
 ### Fase 5 — UX adaptativa y datos server-side
 *Depende de: Fase 0 (capacidades) y Fase 1 (presencia). Puede solaparse con Fase 3. Costo: medio. Reversibilidad: alta.*
 
-1. **Dashboard por capacidades:** mostrar solo las tarjetas de sensores que el dispositivo declara (cierra la brecha actual: gauges hidropónicos en 0/defaults con hardware de suelo). Tarjetas nuevas para `humedad_suelo`/`humedad_aire`. Con la decisión P1 (suelo-first), esto sube de prioridad dentro de la fase: hoy el dashboard le muestra pH/EC/fertilizante a un usuario de maceta de tierra — exactamente lo que no debe pasar en el producto base.
-2. **Estados de error visibles que hoy no existen:** "datos viejos desde hace X min" (stale), "dispositivo nunca ha reportado", "comando de bomba pendiente/sin confirmar", online/offline por dispositivo en la lista de `device_screen`.
+1. ~~**Dashboard por capacidades:**~~ **HECHO.** `isHydroDeviceProvider` oculta pH/EC/tanques/dosificadoras en dispositivos suelo. Tarjetas de `humedad_suelo`/`humedad_aire` implementadas en `SensorCard` y `SimpleMetricsGrid`. Demo mode ahora simula dos dispositivos (full-hydro + soil-only) con switch funcional.
+2. ~~**Estados de error visibles:**~~ **PARCIAL.** `dataStalenessProvider` implementa "datos viejos desde hace X min" (Live/Stale/Offline). El chip de estado en `DeviceScreen` lo consume. **Pendiente:** "dispositivo nunca ha reportado", "comando de bomba pendiente/sin confirmar", online/offline por dispositivo en la lista de `device_screen`.
 3. **Historial server-side:** mover la grabación de `history/` de la app (hoy: solo graba con la app abierta, `sensor_repository_impl.dart:101`) al firmware o a una CF programada; retirar el recorder del repositorio y la poda cliente (que descarga el nodo entero).
 4. **Unificar alertas en un solo lugar** (CF como fuente de verdad; la app solo presenta), eliminando la triplicación actual.
 
@@ -125,30 +130,29 @@ Un mecanismo para que app, firmware y esquema acuerden **qué sensores/actuadore
 
 | # | Deuda | Dónde | Gravedad |
 |---|---|---|---|
-| 1 | Detección de desconexión rota: `conectado` no puede volver a `false`; `staleDataStream` es código muerto | `sensor_stream_service.dart:34`, `dashboard_screen.dart:238`, firmware | Alta (el usuario ve "Conectado" con el equipo muerto) |
+| 1 | ~~Detección de desconexión rota~~ **PARCIAL:** `dataStalenessProvider` reemplaza `staleDataStream` — la UI ahora degrada Live→Stale→Offline por antigüedad de `timestamp`. Pendiente: el booleano `conectado` del firmware sigue sin poder volver a `false`; considerar retirarlo a favor exclusivo de staleness | `data_staleness_provider.dart`, firmware | ~~Alta~~ Baja (mitigado en UI) |
 | 2 | Bug de ruta `sensores` vs `sensors` → push FCM nunca dispara | `functions/index.js:77` | Alta, fix de 1 línea. *(También es el único fix opcional [DEMO-15JUL])* |
 | 3 | Doble escritor sobre `sensors/bomba_agua` (eco optimista de la app + eco del firmware) | `control_service.dart:26`, firmware | Media (carreras visibles al usuario) |
 | 4 | `history/` escrito por la app: huecos cuando nadie abre la app, poda que descarga el nodo completo, sin `.indexOn` | `sensor_repository_impl.dart`, `history_service.dart`, `database.rules.json` | Media-alta |
 | 5 | Reglas: device-hijack (cualquier cuenta puede reclamar cualquier `esp32_id`) y `cached/` escribible por cualquier autenticado | `database.rules.json` | Alta a escala; tolerable con 1 unidad |
-| 6 | `kDemoMode` default `true`: un build sin flag ignora el hardware silenciosamente | `app_config.dart:12` | Media (riesgo operacional, no de código) |
-| 7 | Defaults engañosos de `SensorData.fromMap` (pH 7.0, 0.0) — indistinguible "sin sensor" de "lectura 0" | `sensor_data.dart:62` | Media; lo resuelve el modelo de capacidades |
+| 6 | ~~`kDemoMode` default `true`~~ **RESUELTO:** default cambiado a `false`. Compilar demo requiere `--dart-define=DEMO_MODE=true` explícito | `app_config.dart` | ~~Media~~ Cerrado |
+| 7 | ~~Defaults engañosos~~ **PARCIAL:** `humedadSuelo`/`humedadAire` ahora son nullable (null = sin sensor). pH/EC siguen con default 7.0/0.0 pero `isHydroDeviceProvider` los oculta en dispositivos suelo. Resolver completamente con `DeviceInfo` capabilities | `sensor_data.dart`, `app_providers.dart` | ~~Media~~ Baja |
 | 8 | Heurística EC frágil (`>10` ⇒ µS/cm) repetida en app y CF | `sensor_data.dart:34`, `functions/index.js:52` | Baja; fijar unidad canónica en esquema v2 |
-| 9 | Código muerto: `registrarNFC`/`nfc_logs` (nunca llamado), `staleDataStream` (nunca consumido) | `device_service.dart:123` | Baja |
+| 9 | ~~Código muerto: `registrarNFC`/`nfc_logs`, `staleDataStream`~~ **RESUELTO:** ambos eliminados | — | ~~Baja~~ Cerrado |
 | 10 | Lógica de alertas triplicada (trend provider, notifs locales, CF) | `trend_alert_provider.dart`, `notification_service.dart`, `functions/index.js` | Media |
 | 11 | README documenta reglas/esquema que no existen (`sensores/` raíz) | `README.md` | Baja |
 | 12 | Firmware: credenciales en `#define` dentro del sketch (riesgo de commit de secretos); archivo aún sin commitear | `firmware/esp32_plantylink/esp32_plantylink.ino` | Media *(mitigación mínima [DEMO-15JUL]: `secrets.h` gitignored antes del primer commit del firmware)* |
-| 13 | Shim `MAP_SOIL_TO_TANK` (humedad de suelo disfrazada de nivel de tanque) — préstamo de campo deliberado y señalizado, a retirar con esquema v2 | firmware + `sensor_data.dart` | Media (honestidad del dato) |
+| 13 | ~~Shim `MAP_SOIL_TO_TANK`~~ **RESUELTO:** firmware commit `24342e7` puso `MAP_SOIL_TO_TANK=0` y la app ya muestra `humedad_suelo` directamente | — | ~~Media~~ Cerrado |
 
 ---
 
 ## Qué de esto NO debe tocarse antes del 15 de julio
 
-Regla general: **entre hoy y la demo, el único trabajo debería ser ejecutar el checklist de la demo.** Cada refactor de esta lista arriesga romper el camino feliz que la demo necesita.
+> **Nota (actualización 2026-07-14):** varios ítems de esta lista ya fueron implementados con éxito (humedad_suelo/aire en UI, staleness, shim retirado). Se mantiene la lista como referencia de decisiones, tachando lo resuelto.
 
-- **`firmware/esp32_plantylink/esp32_plantylink.ino`** — NO modularizar, NO migrar a PlatformIO, NO meter NVS/OTA/máquina de estados. Cambios permitidos: solo credenciales, `DEVICE_ID` y las dos constantes de calibración del suelo. (Commitearlo tal cual sí es seguro y recomendado.)
-- **`lib/models/sensor_data.dart` y el esquema de `sensors/`** — NO añadir aún `humedad_suelo`/`humedad_aire` ni retirar el shim `MAP_SOIL_TO_TANK` si eso desestabiliza el dashboard a días de la demo; el shim existe precisamente para que la demo funcione sin tocar la app. (Si sobra un día completo con margen para probar en dispositivo real, es el único ítem de app promovible; si no, va a Fase 0.)
+- **`firmware/esp32_plantylink/esp32_plantylink.ino`** — NO modularizar, NO migrar a PlatformIO, NO meter NVS/OTA/máquina de estados. Cambios permitidos: solo credenciales, `DEVICE_ID` y las dos constantes de calibración del suelo.
+- ~~**`lib/models/sensor_data.dart` y el esquema de `sensors/`** — NO añadir aún `humedad_suelo`/`humedad_aire`~~ **YA HECHO** — `SensorData` los parsea como nullable, el dashboard los muestra, shim `MAP_SOIL_TO_TANK=0`.
 - **`lib/core/services/control_service.dart` (eco optimista)** — NO cambiar la doble escritura ahora: el botón de bomba de la demo depende de ese eco para responder al instante.
-- **`database.rules.json`** — NO endurecer reglas (device-hijack, `cached/`) antes de la demo: el auto-registro del firmware y el emparejamiento del teléfono dependen del comportamiento actual.
-- **`deviceContextProvider` y providers device-scoped** — NO refactorizar; toda la cadena reactiva de la demo pasa por ahí.
-- **Detección de staleness / chip "Conectado"** — aunque está rota (deuda #1), NO rehacerla esta semana: con el firmware publicando cada 5 s el chip funciona de facto durante la demo. En su lugar, mitigación operacional: verificar el monitor Serial antes de presentar y tener hotspot 2.4 GHz de respaldo.
-- **Único cambio de código seguro y recomendado pre-demo:** `sensores` → `sensors` en `functions/index.js:77` + redeploy de functions (no toca la app ni el firmware; solo activa las push). Opcional.
+- **`database.rules.json`** — NO endurecer reglas (device-hijack, `cached/`) antes de la demo.
+- ~~**Detección de staleness / chip "Conectado"**~~ **YA HECHO** — `dataStalenessProvider` reemplaza `staleDataStream`; la UI degrada Live→Stale→Offline.
+- **Único cambio de código seguro y recomendado pre-demo:** `sensores` → `sensors` en `functions/index.js:77` + redeploy de functions.

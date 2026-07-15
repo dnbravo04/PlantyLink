@@ -5,8 +5,8 @@ import '../firebase_constants.dart';
 
 /// Owns the real-time Firebase RTDB listener on `devices/{esp32Id}/sensors/`.
 ///
-/// Single responsibility: produce a [SensorData] stream and expose
-/// stale-data detection. No writes, no profile concerns.
+/// Single responsibility: produce a [SensorData] stream. Stale-data detection
+/// is handled by `dataStalenessProvider` (Riverpod), not here.
 class SensorStreamService {
   late final FirebaseDatabase _db;
   final String esp32Id;
@@ -29,13 +29,4 @@ class SensorStreamService {
     }).distinct();
   }
 
-  /// Emits `true` when the most-recent sensor timestamp is older than
-  /// [staleThreshold] (default 10 s), indicating the ESP32 stopped sending.
-  Stream<bool> staleDataStream({
-    Duration staleThreshold = const Duration(seconds: 10),
-  }) {
-    return sensorStream.map((sensor) {
-      return DateTime.now().difference(sensor.timestamp) > staleThreshold;
-    });
-  }
 }

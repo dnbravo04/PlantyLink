@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_color_scheme.dart';
+import '../../../core/utils/app_page_route.dart';
 import '../../../core/utils/profile_photo.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/common/app_scaffold.dart';
 import '../../widgets/common/app_toast.dart';
 import '../../widgets/common/user_avatar.dart';
 import '../../../app.dart';
+import 'preferences_screen.dart';
 
 /// User profile & account management screen.
 class ProfileSettingsScreen extends ConsumerStatefulWidget {
@@ -220,7 +222,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     try {
       final uid = user.uid;
       await ref.read(userServiceProvider)?.deleteUserData(uid);
-      await GoogleSignIn().signOut();
+      await GoogleSignIn.instance.signOut();
       await user.delete();
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
@@ -269,7 +271,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     );
 
     if (confirmed == true) {
-      await GoogleSignIn().signOut();
+      await GoogleSignIn.instance.signOut();
       await FirebaseAuth.instance.signOut();
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(
@@ -302,13 +304,19 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
-          _buildSectionTitle('Perfil de usuario', c),
+          // Vista única de perfil + cuenta (Eje 5): tres grupos con jerarquía
+          // clara — datos personales, preferencias, y zona de riesgo al final.
+          _buildSectionTitle('Información personal', c),
           const SizedBox(height: 8),
           _buildProfileCard(userAsync, c),
           const SizedBox(height: 24),
-          _buildSectionTitle('Cuenta', c),
+          _buildSectionTitle('Preferencias de la app', c),
           const SizedBox(height: 8),
-          _buildAccountCard(c),
+          _buildPreferencesCard(context, c),
+          const SizedBox(height: 24),
+          _buildSectionTitle('Zona de riesgo', c),
+          const SizedBox(height: 8),
+          _buildDangerZoneCard(c),
           const SizedBox(height: 24),
         ],
       ),
@@ -500,7 +508,42 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     );
   }
 
-  Widget _buildAccountCard(AppColorScheme c) {
+  /// Grouped tile helper — Material 3 ListTile with a tinted leading icon.
+  Widget _groupTile({
+    required AppColorScheme c,
+    required IconData icon,
+    required Color color,
+    required String title,
+    String? subtitle,
+    Color? titleColor,
+    required VoidCallback onTap,
+    BorderRadius? shape,
+  }) {
+    return ListTile(
+      shape: shape == null
+          ? null
+          : RoundedRectangleBorder(borderRadius: shape),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(title,
+          style: TextStyle(
+              color: titleColor ?? c.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle, style: TextStyle(color: c.textMuted, fontSize: 12)),
+      trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildPreferencesCard(BuildContext context, AppColorScheme c) {
     return Container(
       decoration: BoxDecoration(
         color: c.cardBackground,
@@ -509,64 +552,59 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       ),
       child: Column(
         children: [
-          ListTile(
-            shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: c.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Icon(Icons.lock_reset_rounded, color: c.primary, size: 20),
-            ),
-            title: Text('Cambiar contraseña',
-                style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500)),
-            subtitle: Text('Solo cuentas de correo',
-                style: TextStyle(color: c.textMuted, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
-            onTap: _changePassword,
+          _groupTile(
+            c: c,
+            icon: Icons.tune_rounded,
+            color: c.info,
+            title: 'Preferencias',
+            subtitle: 'Tema, unidades, notificaciones',
+            shape: const BorderRadius.vertical(top: Radius.circular(20)),
+            onTap: () => Navigator.push(
+                context, AppPageRoute(builder: (_) => const PreferencesScreen())),
           ),
           Divider(height: 1, color: c.cardBorder),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: c.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10)),
-              child: Icon(Icons.logout_rounded, color: c.warning, size: 20),
-            ),
-            title: Text('Cerrar sesión',
-                style: TextStyle(
-                    color: c.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500)),
-            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+          _groupTile(
+            c: c,
+            icon: Icons.lock_reset_rounded,
+            color: c.primary,
+            title: 'Cambiar contraseña',
+            subtitle: 'Solo cuentas de correo',
+            shape: const BorderRadius.vertical(bottom: Radius.circular(20)),
+            onTap: _changePassword,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Destructive actions grouped at the bottom, visually separated with an
+  /// error-tinted border so they can't be confused with navigation.
+  Widget _buildDangerZoneCard(AppColorScheme c) {
+    return Container(
+      decoration: BoxDecoration(
+        color: c.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.error.withValues(alpha: 0.3), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          _groupTile(
+            c: c,
+            icon: Icons.logout_rounded,
+            color: c.warning,
+            title: 'Cerrar sesión',
+            shape: const BorderRadius.vertical(top: Radius.circular(20)),
             onTap: _signOut,
           ),
           Divider(height: 1, color: c.cardBorder),
-          ListTile(
-            shape: const RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.vertical(bottom: Radius.circular(20))),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: c.error.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10)),
-              child:
-                  Icon(Icons.delete_forever_rounded, color: c.error, size: 20),
-            ),
-            title: Text('Eliminar cuenta',
-                style: TextStyle(
-                    color: c.error,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500)),
-            subtitle: Text('Acción irreversible',
-                style: TextStyle(color: c.textMuted, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+          _groupTile(
+            c: c,
+            icon: Icons.delete_forever_rounded,
+            color: c.error,
+            title: 'Eliminar cuenta',
+            titleColor: c.error,
+            subtitle: 'Acción irreversible',
+            shape: const BorderRadius.vertical(bottom: Radius.circular(20)),
             onTap: _deleteAccount,
           ),
         ],

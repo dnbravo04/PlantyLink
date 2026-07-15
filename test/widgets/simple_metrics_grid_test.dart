@@ -20,7 +20,7 @@ void main() {
         ),
       );
 
-  testWidgets('shows the soil-moisture card when humedadSuelo is present',
+  testWidgets('shows the soil-moisture ring when humedadSuelo is present',
       (tester) async {
     await tester.pumpWidget(wrap(SensorData(
       temperatura: 22,
@@ -28,8 +28,12 @@ void main() {
       timestamp: DateTime.now(),
     )));
 
-    expect(find.text('Humedad de suelo normal'), findsOneWidget);
+    expect(find.text('Humedad de suelo'), findsOneWidget);
+    expect(find.text('Bien hidratada'), findsOneWidget);
     expect(find.text('48%'), findsOneWidget);
+    // Soil-first: hydro metrics stay hidden unless showHydro is true.
+    expect(find.text('Nutrientes'), findsNothing);
+    expect(find.text('Agua (pH)'), findsNothing);
   });
 
   testWidgets('hides the soil-moisture card when humedadSuelo is null',

@@ -1,15 +1,55 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import '../models/device_info.dart';
 import '../models/plant_profile.dart';
 import '../models/sensor_data.dart';
 
-/// Simulates hydroponics sensor data entirely in memory.
+/// Per-device simulation state held in memory.
+class _DeviceSimState {
+  final String id;
+  final String nombre;
+  final DeviceInfo info;
+
+  // Current sensor values — only the ones this device "has".
+  double temperatura;
+  double? ph;
+  double? conductividad;
+  double? nivelAguaTanque;
+  double? nivelFertilizanteTanque;
+  double? humedadSuelo;
+  double? humedadAire;
+  bool nivelAguaBool = true;
+  bool bombaAgua = false;
+  bool bombaFertilizante = false;
+  bool bombaAcido = false;
+  bool bombaBasico = false;
+
+  final List<Map<String, dynamic>> history = [];
+
+  _DeviceSimState({
+    required this.id,
+    required this.nombre,
+    required this.info,
+    required this.temperatura,
+    this.ph,
+    this.conductividad,
+    this.nivelAguaTanque,
+    this.nivelFertilizanteTanque,
+    this.humedadSuelo,
+    this.humedadAire,
+  });
+}
+
+/// Simulates sensor data for TWO demo devices entirely in memory.
 ///
-/// No Firebase reads or writes ever happen here. All data is generated
-/// locally and emitted through [sensorStream], [historyStream], and
-/// [activePlantStream]. Use this service only as a development/demo fallback
-/// — never alongside active Firebase writes.
+/// - **pl-demo-full** ("PlantyLink Pro"): full hydroponic — all sensors and
+///   actuators (pH, EC, tanks, 4 pumps, soil humidity, air humidity, temp).
+/// - **pl-demo-suelo** ("PlantyLink Suelo"): realistic soil scenario — only
+///   temperature, soil humidity, air humidity, and one water pump.
+///
+/// The active device can be switched via [switchDevice]; streams re-emit the
+/// new device's data immediately.
 class DemoDataService {
   static final DemoDataService _instance = DemoDataService._internal();
   factory DemoDataService() => _instance;
@@ -18,62 +58,129 @@ class DemoDataService {
   final _sensorController = StreamController<SensorData>.broadcast();
   final _historyController =
       StreamController<List<Map<String, dynamic>>>.broadcast();
-  // Emits whenever the active plant changes.
   final _plantController = StreamController<PlantProfile>.broadcast();
-  // Emits whenever the crop's planting date changes.
   final _plantingDateController = StreamController<DateTime>.broadcast();
+  /// Emits whenever the active demo device changes.
+  final _activeDeviceController = StreamController<String>.broadcast();
 
   // ── Timers ───────────────────────────────────────────────────────────────
   Timer? _simulationTimer;
   Timer? _historyTimer;
   bool _isRunning = false;
 
-  // ── In-memory sensor state ───────────────────────────────────────────────
-  double _currentTemp = 24.0;
-  double _currentPh = 6.8;
-  double _currentConductividad = 1500.0;
-  double _currentNivelAgua = 75.0;
-  double _currentNivelFertilizante = 60.0;
-  double _currentHumedadSuelo = 55.0; // cultivo en tierra
-  double _currentHumedadAire = 60.0; // DHT22
-  bool _currentNivelAguaBool = true;
-  bool _currentBombaAgua = false;
-  bool _currentBombaFertilizante = false;
-  bool _currentBombaAcido = false;
-  bool _currentBombaBasico = false;
+  // ── Two demo devices ─────────────────────────────────────────────────────
+  static const kFullDeviceId = 'pl-demo-full';
+  static const kSoilDeviceId = 'pl-demo-suelo';
 
-  // ── In-memory history (max 60 entries, mirrors Firebase limitToLast(60)) ─
-  final List<Map<String, dynamic>> _history = [];
+  late final Map<String, _DeviceSimState> _devices;
+  String _activeDeviceId = kFullDeviceId;
+
   static const int _maxHistory = 60;
 
   // ── Plant catalogue ──────────────────────────────────────────────────────
   List<PlantProfile> get availablePlants => PlantCatalog.plantas;
   List<PlantProfile> get plants => PlantCatalog.plantas;
-
-  // Active plant index — kept in memory only.
   int _activePlantIndex = 0;
   PlantProfile get activePlant => availablePlants[_activePlantIndex];
-
-  // Planting date — kept in memory only. Defaults to ~30 days ago so the demo
-  // starts in the vegetative stage with meaningful recommendations.
   DateTime _plantingDate = DateTime.now().subtract(const Duration(days: 30));
 
-  DemoDataService._internal();
+  DemoDataService._internal() {
+    _devices = {
+      kFullDeviceId: _DeviceSimState(
+        id: kFullDeviceId,
+        nombre: 'PlantyLink Pro',
+        info: const DeviceInfo(
+          modeloHardware: 'esp32-hydro-v1',
+          versionFirmware: '1.0.0',
+          tipoCultivo: 'hidroponico',
+          sensores: {
+            'temperatura',
+            'humedad_suelo',
+            'humedad_aire',
+            'ph',
+            'conductividad',
+            'nivel_agua_tanque',
+            'nivel_fertilizante_tanque',
+          },
+          actuadores: {
+            'bomba_agua',
+            'bomba_fertilizante',
+            'bomba_dosificadora_acido',
+            'bomba_dosificadora_basico',
+          },
+        ),
+        temperatura: 24.0,
+        ph: 6.8,
+        conductividad: 1500.0,
+        nivelAguaTanque: 75.0,
+        nivelFertilizanteTanque: 60.0,
+        humedadSuelo: 55.0,
+        humedadAire: 60.0,
+      ),
+      kSoilDeviceId: _DeviceSimState(
+        id: kSoilDeviceId,
+        nombre: 'PlantyLink Suelo',
+        info: const DeviceInfo(
+          modeloHardware: 'esp32-soil-v1',
+          versionFirmware: '0.1.0-demo',
+          tipoCultivo: 'suelo',
+          sensores: {'temperatura', 'humedad_suelo', 'humedad_aire'},
+          actuadores: {'bomba_agua'},
+        ),
+        temperatura: 22.5,
+        humedadSuelo: 45.0,
+        humedadAire: 55.0,
+      ),
+    };
+  }
+
+  // ── Active device ────────────────────────────────────────────────────────
+
+  String get activeDeviceId => _activeDeviceId;
+  _DeviceSimState get _active => _devices[_activeDeviceId]!;
+
+  /// Info for the currently active demo device.
+  DeviceInfo get activeDeviceInfo => _active.info;
+
+  /// Info for a specific demo device by ID.
+  DeviceInfo deviceInfoFor(String id) =>
+      _devices[id]?.info ?? const DeviceInfo();
+
+  /// All demo devices as a list of (id, name) pairs.
+  List<({String id, String nombre})> get demoDevices =>
+      _devices.values.map((d) => (id: d.id, nombre: d.nombre)).toList();
+
+  /// Switches the active device. Re-emits sensor data immediately.
+  void switchDevice(String deviceId) {
+    if (!_devices.containsKey(deviceId) || deviceId == _activeDeviceId) return;
+    _activeDeviceId = deviceId;
+    debugPrint('🔄 DemoDataService: dispositivo activo → $deviceId');
+    _activeDeviceController.add(deviceId);
+    _emitSensorSnapshot();
+    _emitHistory();
+  }
+
+  /// Stream that emits the active device ID whenever it changes.
+  Stream<String> get activeDeviceStream {
+    final current = _activeDeviceId;
+    return Stream.multi((controller) {
+      controller.add(current);
+      final sub = _activeDeviceController.stream.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
+  }
 
   // ── Public streams ───────────────────────────────────────────────────────
 
-  /// Emits a new [SensorData] snapshot every time the simulator ticks.
   Stream<SensorData> get sensorStream => _sensorController.stream;
 
-  /// Emits the full in-memory history list (chronological) on every new entry.
   Stream<List<Map<String, dynamic>>> get historyStream =>
       _historyController.stream;
 
-  /// Emits the active [PlantProfile] whenever it changes.
-  ///
-  /// Subscribers also receive the current value immediately via [Stream.multi]
-  /// so they don't miss the initial plant even if they subscribe after
-  /// [startSimulation] was called.
   Stream<PlantProfile> get activePlantStream {
     final current = activePlant;
     return Stream.multi((controller) {
@@ -87,8 +194,6 @@ class DemoDataService {
     });
   }
 
-  /// Emits the crop's planting date, delivering the current value immediately
-  /// to new subscribers (same pattern as [activePlantStream]).
   Stream<DateTime> get plantingDateStream {
     final current = _plantingDate;
     return Stream.multi((controller) {
@@ -104,28 +209,25 @@ class DemoDataService {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
-  /// Starts the in-memory simulation. Safe to call multiple times.
   void startSimulation() {
     if (_isRunning) return;
     _isRunning = true;
 
-    // Emit an immediate snapshot so the UI has data before the first tick.
     _emitSensorSnapshot();
 
-    // Sensor tick every 3 s
+    // Sensor tick every 3 s — simulates BOTH devices in parallel.
     _simulationTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _simulateSensorChanges();
+      _simulateAllDevices();
     });
 
-    // History entry every 10 s
+    // History entry every 10 s for the active device.
     _historyTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _appendHistory();
     });
 
-    debugPrint('🔄 DemoDataService: simulação iniciada (solo en memoria)');
+    debugPrint('🔄 DemoDataService: simulación iniciada (2 dispositivos)');
   }
 
-  /// Stops all timers and closes the stream controllers.
   void stopSimulation() {
     _simulationTimer?.cancel();
     _historyTimer?.cancel();
@@ -135,18 +237,17 @@ class DemoDataService {
     debugPrint('⏹️ DemoDataService: simulación detenida');
   }
 
-  /// Releases resources. Call when the service is no longer needed.
   void dispose() {
     stopSimulation();
     _sensorController.close();
     _historyController.close();
     _plantController.close();
     _plantingDateController.close();
+    _activeDeviceController.close();
   }
 
-  // ── Plant management (in-memory only) ────────────────────────────────────
+  // ── Plant management ─────────────────────────────────────────────────────
 
-  /// Switches the active plant profile. Has no effect on Firebase.
   void changePlant(int index) {
     if (index < 0 || index >= availablePlants.length) return;
     _activePlantIndex = index;
@@ -154,11 +255,9 @@ class DemoDataService {
     if (!_plantController.isClosed) {
       _plantController.add(activePlant);
     }
-    // Emit a fresh snapshot so listeners reflect the new profile immediately.
     _emitSensorSnapshot();
   }
 
-  /// Updates the crop's planting date. Has no effect on Firebase.
   void setPlantingDate(DateTime date) {
     _plantingDate = date;
     debugPrint('🌱 DemoDataService: fecha de siembra → $date');
@@ -167,19 +266,24 @@ class DemoDataService {
     }
   }
 
-  // ── Pump toggle (in-memory only) ─────────────────────────────────────────
+  // ── Pump toggle ──────────────────────────────────────────────────────────
 
-  /// Simulates toggling a pump. State is kept in memory only.
   void togglePump(String pumpId, bool active) {
+    final dev = _active;
+    // Only toggle pumps this device actually has.
+    if (!dev.info.hasActuator(pumpId)) {
+      debugPrint('⚠️ DemoDataService: ${dev.id} no tiene $pumpId');
+      return;
+    }
     switch (pumpId) {
       case 'bomba_agua':
-        _currentBombaAgua = active;
+        dev.bombaAgua = active;
       case 'bomba_fertilizante':
-        _currentBombaFertilizante = active;
+        dev.bombaFertilizante = active;
       case 'bomba_dosificadora_acido':
-        _currentBombaAcido = active;
+        dev.bombaAcido = active;
       case 'bomba_dosificadora_basico':
-        _currentBombaBasico = active;
+        dev.bombaBasico = active;
       default:
         debugPrint('⚠️ DemoDataService: pumpId desconocido: $pumpId');
         return;
@@ -187,84 +291,122 @@ class DemoDataService {
     _emitSensorSnapshot();
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
+  // ── Simulation logic ─────────────────────────────────────────────────────
 
-  void _simulateSensorChanges() {
+  void _simulateAllDevices() {
     final rng = math.Random();
+    for (final dev in _devices.values) {
+      _simulateDevice(dev, rng);
+    }
+    // Only emit the active device's data to the stream.
+    _emitSensorSnapshot();
+  }
 
-    _currentTemp += (rng.nextDouble() - 0.5);
-    _currentTemp = _currentTemp.clamp(18.0, 30.0);
+  void _simulateDevice(_DeviceSimState dev, math.Random rng) {
+    dev.temperatura += (rng.nextDouble() - 0.5);
+    dev.temperatura = dev.temperatura.clamp(18.0, 30.0);
 
-    _currentPh += (rng.nextDouble() - 0.5) * 0.2;
-    _currentPh = _currentPh.clamp(5.5, 7.5);
-
-    _currentConductividad += (rng.nextDouble() - 0.5) * 100;
-    _currentConductividad = _currentConductividad.clamp(800.0, 2200.0);
-
-    _currentNivelAgua += (rng.nextDouble() - 0.5) * 4;
-    _currentNivelAgua = _currentNivelAgua.clamp(10.0, 100.0);
-
-    _currentNivelFertilizante += (rng.nextDouble() - 0.5) * 4;
-    _currentNivelFertilizante = _currentNivelFertilizante.clamp(10.0, 100.0);
-
-    _currentHumedadSuelo += (rng.nextDouble() - 0.5) * 3;
-    _currentHumedadSuelo = _currentHumedadSuelo.clamp(20.0, 90.0);
-
-    _currentHumedadAire += (rng.nextDouble() - 0.5) * 2;
-    _currentHumedadAire = _currentHumedadAire.clamp(35.0, 85.0);
-
-    // Occasionally simulate a low-water alert
-    if (rng.nextDouble() < 0.05) {
-      _currentNivelAguaBool = false;
-    } else if (_currentNivelAgua > 30) {
-      _currentNivelAguaBool = true;
+    if (dev.humedadSuelo != null) {
+      dev.humedadSuelo = (dev.humedadSuelo! + (rng.nextDouble() - 0.5) * 3)
+          .clamp(20.0, 90.0);
+    }
+    if (dev.humedadAire != null) {
+      dev.humedadAire = (dev.humedadAire! + (rng.nextDouble() - 0.5) * 2)
+          .clamp(35.0, 85.0);
+    }
+    if (dev.ph != null) {
+      dev.ph = (dev.ph! + (rng.nextDouble() - 0.5) * 0.2).clamp(5.5, 7.5);
+    }
+    if (dev.conductividad != null) {
+      dev.conductividad =
+          (dev.conductividad! + (rng.nextDouble() - 0.5) * 100)
+              .clamp(800.0, 2200.0);
+    }
+    if (dev.nivelAguaTanque != null) {
+      dev.nivelAguaTanque =
+          (dev.nivelAguaTanque! + (rng.nextDouble() - 0.5) * 4)
+              .clamp(10.0, 100.0);
+    }
+    if (dev.nivelFertilizanteTanque != null) {
+      dev.nivelFertilizanteTanque =
+          (dev.nivelFertilizanteTanque! + (rng.nextDouble() - 0.5) * 4)
+              .clamp(10.0, 100.0);
     }
 
-    _emitSensorSnapshot();
+    // Occasionally simulate a low-water alert on full device.
+    if (dev.nivelAguaTanque != null) {
+      if (rng.nextDouble() < 0.05) {
+        dev.nivelAguaBool = false;
+      } else if (dev.nivelAguaTanque! > 30) {
+        dev.nivelAguaBool = true;
+      }
+    }
   }
 
   void _emitSensorSnapshot() {
     if (_sensorController.isClosed) return;
-    _sensorController.add(
-      SensorData.fromMap({
-        'temperatura': _currentTemp,
-        'humedad_suelo': _currentHumedadSuelo,
-        'humedad_aire': _currentHumedadAire,
-        'ph': _currentPh,
-        'conductividad': _currentConductividad,
-        'nivel_agua_tanque': _currentNivelAgua,
-        'nivel_fertilizante_tanque': _currentNivelFertilizante,
-        'nivel_agua': _currentNivelAguaBool,
-        'bomba_agua': _currentBombaAgua,
-        'bomba_fertilizante': _currentBombaFertilizante,
-        'bomba_dosificadora_acido': _currentBombaAcido,
-        'bomba_dosificadora_basico': _currentBombaBasico,
-        'conectado': true,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      }),
-    );
+    final dev = _active;
+    final map = <String, dynamic>{
+      'temperatura': dev.temperatura,
+      'conectado': true,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'bomba_agua': dev.bombaAgua,
+    };
+
+    // Only include keys that this device's sensors/actuators support.
+    if (dev.humedadSuelo != null) map['humedad_suelo'] = dev.humedadSuelo;
+    if (dev.humedadAire != null) map['humedad_aire'] = dev.humedadAire;
+    if (dev.ph != null) map['ph'] = dev.ph;
+    if (dev.conductividad != null) map['conductividad'] = dev.conductividad;
+    if (dev.nivelAguaTanque != null) {
+      map['nivel_agua_tanque'] = dev.nivelAguaTanque;
+      map['nivel_agua'] = dev.nivelAguaBool;
+    }
+    if (dev.nivelFertilizanteTanque != null) {
+      map['nivel_fertilizante_tanque'] = dev.nivelFertilizanteTanque;
+    }
+    if (dev.info.hasActuator('bomba_fertilizante')) {
+      map['bomba_fertilizante'] = dev.bombaFertilizante;
+    }
+    if (dev.info.hasActuator('bomba_dosificadora_acido')) {
+      map['bomba_dosificadora_acido'] = dev.bombaAcido;
+    }
+    if (dev.info.hasActuator('bomba_dosificadora_basico')) {
+      map['bomba_dosificadora_basico'] = dev.bombaBasico;
+    }
+
+    _sensorController.add(SensorData.fromMap(map));
+  }
+
+  void _emitHistory() {
+    if (_historyController.isClosed) return;
+    _historyController.add(List.unmodifiable(_active.history));
   }
 
   void _appendHistory() {
     if (_historyController.isClosed) return;
+    final dev = _active;
 
     final entry = <String, dynamic>{
-      'temperatura': _currentTemp,
-      'humedad_suelo': _currentHumedadSuelo,
-      'humedad_aire': _currentHumedadAire,
-      'ph': _currentPh,
-      'conductividad': _currentConductividad,
-      'nivel_agua_tanque': _currentNivelAgua,
-      'nivel_fertilizante_tanque': _currentNivelFertilizante,
+      'temperatura': dev.temperatura,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
-
-    _history.add(entry);
-    // Keep list bounded, drop oldest entries
-    if (_history.length > _maxHistory) {
-      _history.removeAt(0);
+    if (dev.humedadSuelo != null) entry['humedad_suelo'] = dev.humedadSuelo;
+    if (dev.humedadAire != null) entry['humedad_aire'] = dev.humedadAire;
+    if (dev.ph != null) entry['ph'] = dev.ph;
+    if (dev.conductividad != null) entry['conductividad'] = dev.conductividad;
+    if (dev.nivelAguaTanque != null) {
+      entry['nivel_agua_tanque'] = dev.nivelAguaTanque;
+    }
+    if (dev.nivelFertilizanteTanque != null) {
+      entry['nivel_fertilizante_tanque'] = dev.nivelFertilizanteTanque;
     }
 
-    _historyController.add(List.unmodifiable(_history));
+    dev.history.add(entry);
+    if (dev.history.length > _maxHistory) {
+      dev.history.removeAt(0);
+    }
+
+    _historyController.add(List.unmodifiable(dev.history));
   }
 }

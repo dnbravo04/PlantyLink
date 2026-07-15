@@ -2,6 +2,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 import 'app.dart';
 import 'core/app_config.dart';
@@ -23,6 +24,13 @@ void main() async {
     ).setPersistenceEnabled(true);
   } catch (_) {
     // Firebase may already be initialized (hot restart, etc.).
+  }
+
+  // Initialize Google Sign-In (must be called once before authenticate/signOut).
+  try {
+    await GoogleSignIn.instance.initialize();
+  } catch (_) {
+    // Non-critical — sign-in will fail gracefully at call site.
   }
 
   // Initialize push notifications (requests permission, registers FCM handlers,
