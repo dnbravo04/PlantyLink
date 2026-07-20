@@ -7,17 +7,11 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
-// ─── Configuración: EDITAR ANTES DE FLASHEAR ─────────────────────────────────
-#define WIFI_SSID       "REDACTED_WIFI_SSID"
-#define WIFI_PASSWORD   "REDACTED_WIFI_PASSWORD"
-
-#define API_KEY         "AIzaSyADO17mJSijQWZmYXcju-9tx1ftHD-HYRU"
-#define DATABASE_URL    "https://hydrotrack-13047.firebaseio.com"
-
-#define DEVICE_EMAIL    "esp32-01@plantylink.device"
-#define DEVICE_PASSWORD "REDACTED_DEVICE_PASSWORD"
-
-#define DEVICE_ID       "pl-esp32-01"
+// ─── Configuración ────────────────────────────────────────────────────────
+// Credenciales en secrets.h (gitignored, NUNCA se commitea). Copia
+// secrets.h.example → secrets.h y llena tus valores. Ver ese archivo para
+// dónde conseguir cada credencial.
+#include "secrets.h"
 
 #define FW_VERSION      "0.2.0-demo-ingenia"
 #define HW_MODEL        "esp32-demo-v1"
