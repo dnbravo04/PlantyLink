@@ -7,6 +7,7 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
+<<<<<<< HEAD
 // ─── Configuración: EDITAR ANTES DE FLASHEAR ─────────────────────────────────
 #define WIFI_SSID       "VERANO"
 #define WIFI_PASSWORD   "TOMAS*21"
@@ -18,6 +19,13 @@
 #define DEVICE_PASSWORD "#PlantyPasword"
 
 #define DEVICE_ID       "pl-esp32-01"
+=======
+// ─── Configuración ────────────────────────────────────────────────────────
+// Credenciales en secrets.h (gitignored, NUNCA se commitea). Copia
+// secrets.h.example → secrets.h y llena tus valores. Ver ese archivo para
+// dónde conseguir cada credencial.
+#include "secrets.h"
+>>>>>>> a3f10e18116dc933570c8931335318cc8eb05b81
 
 #define FW_VERSION      "0.2.0-demo-ingenia"
 #define HW_MODEL        "esp32-demo-v1"

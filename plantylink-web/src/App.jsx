@@ -337,12 +337,17 @@ function App() {
             <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
               Únete a la nueva generación de cuidado de plantas. Descarga la app y empieza hoy.
             </p>
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-3xl max-w-md mx-auto">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-3xl max-w-lg mx-auto">
               <p className="text-planty-light font-semibold mb-4">Versión actual: v1.0 (Julio 2026)</p>
-              <a href="/downloads/PlantyLink.apk" className="block w-full bg-planty hover:bg-planty-dark text-white py-4 rounded-xl font-bold text-lg transition mb-4 shadow-[0_0_20px_rgba(5,150,105,0.4)] hover:shadow-[0_0_30px_rgba(5,150,105,0.6)] hover:-translate-y-1">
-                Descargar APK (Android)
-              </a>
-              <p className="text-sm text-gray-400">Requiere Android 5.0 (API 21) o superior</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a href="/downloads/app-release.apk" className="flex-1 block bg-planty hover:bg-planty-dark text-white py-4 rounded-xl font-bold text-lg transition shadow-[0_0_20px_rgba(5,150,105,0.4)] hover:shadow-[0_0_30px_rgba(5,150,105,0.6)] hover:-translate-y-1">
+                  Descargar APK
+                </a>
+                <a href="/downloads/app-demo.apk" className="flex-1 block bg-white/10 hover:bg-white/20 border border-white/30 text-white py-4 rounded-xl font-bold text-lg transition hover:-translate-y-1">
+                  Descargar Demo
+                </a>
+              </div>
+              <p className="text-sm text-gray-400 mt-4">Requiere Android 5.0 (API 21) o superior</p>
             </div>
           </motion.div>
         </div>
